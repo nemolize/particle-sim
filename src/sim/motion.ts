@@ -51,23 +51,18 @@ export const gravityFromAcceleration = (reading: Vec2, angle: number): Vec2 => {
   return { x: gravity.x * scale, y: gravity.y * scale };
 };
 
-const FLAT = 1e-9;
-
-/** Unit in-plane gravity from `deviceorientation` degrees; a flat device has none. */
+/** In-plane gravity from `deviceorientation` degrees, in g; it shrinks to 0 as the device lies flat. */
 export const gravityFromOrientation = (
   { beta, gamma }: Orientation,
   angle: number,
 ): Vec2 => {
   const betaRadians = (beta * Math.PI) / 180;
   const gammaRadians = (gamma * Math.PI) / 180;
-  const screen = rotateToScreen(
+  return rotateToScreen(
     {
       x: Math.sin(gammaRadians) * Math.cos(betaRadians),
       y: -Math.sin(betaRadians),
     },
     angle,
   );
-  const magnitude = Math.hypot(screen.x, screen.y);
-  if (magnitude < FLAT) return { x: 0, y: 0 };
-  return { x: screen.x / magnitude, y: screen.y / magnitude };
 };

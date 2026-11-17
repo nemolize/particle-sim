@@ -117,14 +117,14 @@ describe("gravityFromOrientation", () => {
   });
 
   it("pulls toward the side tipped down", () => {
-    const right = gravityFromOrientation({ beta: 0, gamma: 45 }, 0);
+    const right = gravityFromOrientation({ beta: 0, gamma: 90 }, 0);
     expect(right.x).toBeCloseTo(1);
     expect(right.y).toBeCloseTo(0);
-    const left = gravityFromOrientation({ beta: 0, gamma: -45 }, 0);
+    const left = gravityFromOrientation({ beta: 0, gamma: -90 }, 0);
     expect(left.x).toBeCloseTo(-1);
-    const topDown = gravityFromOrientation({ beta: 45, gamma: 0 }, 0);
+    const topDown = gravityFromOrientation({ beta: 90, gamma: 0 }, 0);
     expect(topDown.y).toBeCloseTo(-1);
-    const bottomDown = gravityFromOrientation({ beta: -45, gamma: 0 }, 0);
+    const bottomDown = gravityFromOrientation({ beta: -90, gamma: 0 }, 0);
     expect(bottomDown.y).toBeCloseTo(1);
   });
 
@@ -134,20 +134,37 @@ describe("gravityFromOrientation", () => {
     [180, { x: -1, y: 0 }],
     [270, { x: 0, y: -1 }],
   ])("rotates the tilt with the screen at angle %s", (angle, expected) => {
-    const tilt = gravityFromOrientation({ beta: 0, gamma: 45 }, angle);
+    const tilt = gravityFromOrientation({ beta: 0, gamma: 90 }, angle);
     expect(tilt.x).toBeCloseTo(expected.x);
     expect(tilt.y).toBeCloseTo(expected.y);
   });
 
-  it("is a unit vector however far the device leans", () => {
+  it("keeps the in-plane part of the unit gravity vector", () => {
     const tilt = gravityFromOrientation({ beta: 60, gamma: 30 }, 0);
-    expect(Math.hypot(tilt.x, tilt.y)).toBeCloseTo(1);
+    expect(tilt.x).toBeCloseTo(0.25);
+    expect(tilt.y).toBeCloseTo(-Math.sqrt(3) / 2);
   });
 
-  it("has no direction for a device lying flat", () => {
-    expect(gravityFromOrientation({ beta: 0, gamma: 0 }, 0)).toEqual({
-      x: 0,
-      y: 0,
-    });
+  it("never pulls harder than 1 g", () => {
+    for (const beta of [-180, -135, -90, -45, 0, 30, 60, 90, 135, 180]) {
+      for (const gamma of [-90, -60, -30, 0, 30, 60, 90]) {
+        const tilt = gravityFromOrientation({ beta, gamma }, 0);
+        expect(Math.hypot(tilt.x, tilt.y)).toBeLessThanOrEqual(1 + 1e-12);
+      }
+    }
+  });
+
+  it.each([0, 90, 180, 270])(
+    "pulls weakly, not in a flipped direction, for a nearly flat device at screen angle %s",
+    (angle) => {
+      const tilt = gravityFromOrientation({ beta: 0.5, gamma: 0.5 }, angle);
+      expect(Math.hypot(tilt.x, tilt.y)).toBeLessThan(0.02);
+    },
+  );
+
+  it("has no pull for a device lying flat", () => {
+    const tilt = gravityFromOrientation({ beta: 0, gamma: 0 }, 0);
+    expect(tilt.x).toBeCloseTo(0);
+    expect(tilt.y).toBeCloseTo(0);
   });
 });
