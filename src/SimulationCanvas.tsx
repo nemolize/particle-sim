@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { Settings } from "@/settings";
 import { Simulator } from "@/sim/gpu/simulator";
+import type { Vec2 } from "@/sim/motion";
 import type { Stats } from "@/sim/stats";
 import type { Pointer } from "@/sim/uniforms";
 
@@ -16,6 +17,7 @@ interface Props {
   /** Bumped by the Reset button to reload the scene with unchanged settings. */
   resetToken: number;
   onStats: (stats: Stats) => void;
+  readGravity: () => Vec2;
 }
 
 export const SimulationCanvas = ({
@@ -23,6 +25,7 @@ export const SimulationCanvas = ({
   paused,
   resetToken,
   onStats,
+  readGravity,
 }: Props) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const simulatorRef = useRef<Simulator>(undefined);
@@ -32,11 +35,13 @@ export const SimulationCanvas = ({
   const settingsRef = useRef(settings);
   const pausedRef = useRef(paused);
   const onStatsRef = useRef(onStats);
+  const readGravityRef = useRef(readGravity);
   const pointerRef = useRef<Pointer>({ x: 0, y: 0, pressed: false });
   useEffect(() => {
     settingsRef.current = settings;
     pausedRef.current = paused;
     onStatsRef.current = onStats;
+    readGravityRef.current = readGravity;
   });
 
   useEffect(() => {
@@ -93,10 +98,15 @@ export const SimulationCanvas = ({
           busy = true;
           frame++;
           void simulator
-            .frame(settingsRef.current, pointerRef.current, {
-              step: !pausedRef.current,
-              readStats: frame % STATS_INTERVAL_FRAMES === 0,
-            })
+            .frame(
+              settingsRef.current,
+              pointerRef.current,
+              readGravityRef.current(),
+              {
+                step: !pausedRef.current,
+                readStats: frame % STATS_INTERVAL_FRAMES === 0,
+              },
+            )
             .then((stats) => {
               if (stats !== undefined && !abort.signal.aborted) {
                 onStatsRef.current(stats);

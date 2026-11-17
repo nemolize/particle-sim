@@ -11,11 +11,11 @@ const f = (value: number): string => value.toPrecision(9);
 
 const COMMON = /* wgsl */ `
 struct Params {
-  gravity: f32,
+  gravity: vec2f,
+  pointer: vec2f,
   stiffness: f32,
   dt: f32,
   count: u32,
-  pointer: vec2f,
   pointerRadius: f32,
   pointerAccel: f32,
   solidStiffness: f32,
@@ -134,7 +134,7 @@ fn updateGrid(@builtin(global_invocation_id) id: vec3u) {
   var v = vec2f(0.0);
   if (mass > 0.0) {
     v = vec2f(f32(atomicLoad(&grid[3u * i + 1u])), f32(atomicLoad(&grid[3u * i + 2u]))) / (FIXED * mass);
-    v.y -= params.dt * params.gravity;
+    v += params.dt * params.gravity;
 
     let node = vec2f(f32(i % GRID), f32(i / GRID));
     let toPointer = params.pointer - node * DX;

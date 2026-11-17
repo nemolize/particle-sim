@@ -1,6 +1,8 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
 import { PARTICLE_SPACING } from "../src/sim/params";
+import { createParticles } from "../src/sim/scenes";
+import { summarize } from "../src/sim/stats";
 import { isPreviewTarget } from "./target";
 
 /** A software fallback adapter cannot present to the canvas, so only hardware counts. */
@@ -231,6 +233,63 @@ test("should leave a solid block at rest when attract is pressed out of its reac
   await page.mouse.up();
 
   expect(peakSpeed).toBeLessThan(RESTING_SPEED_CEILING);
+});
+
+const GRAVITY_TEST_TIMEOUT_MS = 60_000;
+const SPIKE_COUNT = 10;
+const STABLE_READS_AFTER_SPIKES = 6;
+const SENSOR_G = 9.8;
+
+const sendAccelerations = (page: Page, ys: number[]): Promise<void> =>
+  page.evaluate(async (readings) => {
+    for (const y of readings) {
+      window.dispatchEvent(
+        new DeviceMotionEvent("devicemotion", {
+          accelerationIncludingGravity: { x: 0, y, z: 0 },
+        }),
+      );
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+  }, ys);
+
+/** Chromium asks for sensor permission like iOS Safari does, so the toggle starts off there. */
+const startMotionScene = async (page: Page): Promise<Locator> => {
+  await page.context().grantPermissions(["accelerometer", "gyroscope"]);
+  const stats = await startScene(page, "dam");
+  const toggle = page.getByLabel("Motion");
+  await expect(toggle).toBeVisible();
+  if (!(await toggle.isChecked())) await toggle.click();
+  await expect(toggle).toBeChecked();
+  return stats;
+};
+
+test("should lift the fluid when the device is turned upside down", async ({
+  page,
+}) => {
+  test.setTimeout(GRAVITY_TEST_TIMEOUT_MS);
+  const stats = await startMotionScene(page);
+  const startHeight = summarize(createParticles("dam")).meanHeight;
+
+  await sendAccelerations(page, [-SENSOR_G]);
+  await expect
+    .poll(async () => readStat(stats, "Mean height"), { timeout: 30_000 })
+    .toBeGreaterThan(startHeight + 0.05);
+  await expect(stats).toContainText("Stable");
+});
+
+test("should stay stable under alternating 10 g spikes", async ({ page }) => {
+  test.setTimeout(GRAVITY_TEST_TIMEOUT_MS);
+  const stats = await startMotionScene(page);
+
+  const spikes = Array.from(
+    { length: SPIKE_COUNT },
+    (_, index) => (index % 2 === 0 ? 1 : -1) * 10 * SENSOR_G,
+  );
+  await sendAccelerations(page, spikes);
+  await expect
+    .poll(stableReads(stats), { intervals: [500], timeout: 30_000 })
+    .toBeGreaterThanOrEqual(STABLE_READS_AFTER_SPIKES);
 });
 
 test("should explain a browser without WebGPU", async ({ page }) => {

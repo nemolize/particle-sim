@@ -32,6 +32,13 @@ press and drag on the canvas to attract or repel the particles. The side panel
 changes the fluid and solid stiffness and gravity, pauses, and resets; its statistics are read back
 from the GPU a few times per second.
 
+On a phone or tablet, tilting the device tilts gravity and shaking it pushes the
+fluid, the canvas acting as a container fixed to the screen. The `Motion` toggle
+in the side panel appears on a device that delivers sensor data and turns this
+off. iOS Safari asks permission when you turn it on, and the browser only
+delivers sensor data to a secure context (HTTPS or `localhost`). The `Gravity`
+slider keeps its meaning as the strength of 1 g.
+
 It needs a browser with WebGPU, such as a recent Chrome, Edge or Safari. Without
 it the page says so instead of drawing.
 
