@@ -240,18 +240,21 @@ const SPIKE_COUNT = 10;
 const STABLE_READS_AFTER_SPIKES = 6;
 const SENSOR_G = 9.8;
 
-const sendAccelerations = (page: Page, ys: number[]): Promise<void> =>
+const sendAccelerations = (
+  page: Page,
+  readings: { x: number; y: number }[],
+): Promise<void> =>
   page.evaluate(async (readings) => {
-    for (const y of readings) {
+    for (const { x, y } of readings) {
       window.dispatchEvent(
         new DeviceMotionEvent("devicemotion", {
-          accelerationIncludingGravity: { x: 0, y, z: 0 },
+          accelerationIncludingGravity: { x, y, z: 0 },
         }),
       );
       await new Promise((resolve) => requestAnimationFrame(resolve));
       await new Promise((resolve) => requestAnimationFrame(resolve));
     }
-  }, ys);
+  }, readings);
 
 /** Chromium asks for sensor permission like iOS Safari does, so the toggle starts off there. */
 const startMotionScene = async (page: Page): Promise<Locator> => {
@@ -271,7 +274,7 @@ test("should lift the fluid when the device is turned upside down", async ({
   const stats = await startMotionScene(page);
   const startHeight = summarize(createParticles("dam")).meanHeight;
 
-  await sendAccelerations(page, [-SENSOR_G]);
+  await sendAccelerations(page, [{ x: 0, y: -SENSOR_G }]);
   await expect
     .poll(async () => readStat(stats, "Mean height"), { timeout: 30_000 })
     .toBeGreaterThan(startHeight + 0.05);
@@ -282,14 +285,38 @@ test("should stay stable under alternating 10 g spikes", async ({ page }) => {
   test.setTimeout(GRAVITY_TEST_TIMEOUT_MS);
   const stats = await startMotionScene(page);
 
-  const spikes = Array.from(
-    { length: SPIKE_COUNT },
-    (_, index) => (index % 2 === 0 ? 1 : -1) * 10 * SENSOR_G,
-  );
+  const spikes = Array.from({ length: SPIKE_COUNT }, (_, index) => ({
+    x: 0,
+    y: (index % 2 === 0 ? 1 : -1) * 10 * SENSOR_G,
+  }));
   await sendAccelerations(page, spikes);
   await expect
     .poll(stableReads(stats), { intervals: [500], timeout: 30_000 })
     .toBeGreaterThanOrEqual(STABLE_READS_AFTER_SPIKES);
+});
+
+const TILT_WINDOW_MS = 5_000;
+/** A blow-up reads in the thousands; a fluid hitting a wall reads in the tens. */
+const TILT_SPEED_CEILING = 100;
+
+test("should not blow up when the device is tilted 45 degrees to the right", async ({
+  page,
+}) => {
+  test.setTimeout(GRAVITY_TEST_TIMEOUT_MS);
+  const stats = await startMotionScene(page);
+
+  const side = SENSOR_G * Math.SQRT1_2;
+  await sendAccelerations(page, [{ x: -side, y: side }]);
+  // The column of water is still standing when gravity swings sideways.
+  await page.getByRole("button", { name: "Reset" }).click();
+  let peakSpeed = 0;
+  const windowEnd = Date.now() + TILT_WINDOW_MS;
+  while (Date.now() < windowEnd) {
+    peakSpeed = Math.max(peakSpeed, await readStat(stats, "Max speed"));
+  }
+  await expect(stats).toContainText("Stable");
+
+  expect(peakSpeed).toBeLessThan(TILT_SPEED_CEILING);
 });
 
 test("should explain a browser without WebGPU", async ({ page }) => {

@@ -53,6 +53,8 @@ ${COMMON}
 @group(0) @binding(3) var<storage, read_write> gridVelocity: array<vec2f>;
 
 const MIN_DET: f32 = 0.1;
+// Chosen empirically, no fixed source: without a floor, fluid packed against a wall blows up.
+const MIN_J: f32 = 0.6;
 
 fn rotationOf(f: mat2x2f) -> mat2x2f {
   let cosine = f[0][0] + f[1][1];
@@ -182,7 +184,7 @@ fn gridToParticle(@builtin(global_invocation_id) id: vec3u) {
   if (isSolid(p)) {
     p.f = keepInvertible((mat2x2f(1.0, 0.0, 0.0, 1.0) + params.dt * c) * p.f);
   } else {
-    p.j = p.j * (1.0 + params.dt * (c[0][0] + c[1][1]));
+    p.j = max(p.j * (1.0 + params.dt * (c[0][0] + c[1][1])), MIN_J);
   }
   particles[id.x] = p;
 }
