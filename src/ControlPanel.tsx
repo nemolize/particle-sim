@@ -9,6 +9,7 @@ import {
   SCENE_LABELS,
   SCENES,
   type Settings,
+  SOLID_STIFFNESS_RANGE,
   STIFFNESS_RANGE,
 } from "@/settings";
 import type { Stats } from "@/sim/stats";
@@ -78,13 +79,26 @@ export const ControlPanel = ({
           ))}
         </select>
       </Field>
-      <Field label={`Stiffness ${String(settings.stiffness)}`}>
+      <Field label={`Fluid stiffness ${String(settings.stiffness)}`}>
         <input
           type="range"
           {...STIFFNESS_RANGE}
           value={settings.stiffness}
           onChange={(event) => {
             onChange({ ...settings, stiffness: event.target.valueAsNumber });
+          }}
+        />
+      </Field>
+      <Field label={`Solid stiffness ${String(settings.solidStiffness)}`}>
+        <input
+          type="range"
+          {...SOLID_STIFFNESS_RANGE}
+          value={settings.solidStiffness}
+          onChange={(event) => {
+            onChange({
+              ...settings,
+              solidStiffness: event.target.valueAsNumber,
+            });
           }}
         />
       </Field>
@@ -123,11 +137,13 @@ export const ControlPanel = ({
       <dd className="text-right tabular-nums">{stats.meanHeight.toFixed(3)}</dd>
       <dt>Max speed</dt>
       <dd className="text-right tabular-nums">{stats.maxSpeed.toFixed(2)}</dd>
+      <dt>Solid area</dt>
+      <dd className="text-right tabular-nums">{stats.solidArea.toFixed(3)}</dd>
       <dt>State</dt>
       <dd className="text-right">{stats.healthy ? "Stable" : "Diverged"}</dd>
     </dl>
     <p className="text-xs text-gray-500">
-      Press and drag on the water to {settings.pointerMode} it.
+      Press and drag on the particles to {settings.pointerMode} them.
     </p>
   </aside>
 );

@@ -1,4 +1,4 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 
 import { isPreviewTarget } from "./target";
 
@@ -69,6 +69,113 @@ test("should rebuild the scene when Reset is pressed", async ({ page }) => {
     "Stable",
   );
 });
+
+const startScene = async (page: Page, scene: string): Promise<Locator> => {
+  await page.goto("/");
+  test.skip(
+    !(await hasUsableWebGpu(page)),
+    "no hardware WebGPU in this browser",
+  );
+  await expect(page.getByLabel("Particle simulation")).toHaveAttribute(
+    "data-ready",
+    "true",
+    { timeout: 30_000 },
+  );
+  await page.getByLabel("Scene").selectOption(scene);
+  await page.getByRole("button", { name: "Reset" }).click();
+  return page.getByLabel("Simulation statistics");
+};
+
+const readStat = async (stats: Locator, name: string): Promise<number> => {
+  const text = await stats.innerText();
+  return Number(
+    new RegExp(`${name}\\s*([\\d.]+)`).exec(text)?.[1] ?? Number.NaN,
+  );
+};
+
+const restingSolidArea = async (stats: Locator): Promise<number> => {
+  const area = await readStat(stats, "Solid area");
+  const speed = await readStat(stats, "Max speed");
+  return area > 0 && speed < 0.05 ? area : Number.NaN;
+};
+
+const BLOCK_AREA = 0.2 ** 2;
+const POOL_BLOCK_AREA = 0.15 ** 2;
+const SOLID_TEST_TIMEOUT_MS = 150_000;
+
+const restsWithin =
+  (stats: Locator, start: number, low: number, high: number) =>
+  async (): Promise<boolean> => {
+    const ratio = (await restingSolidArea(stats)) / start;
+    return ratio >= low && ratio <= high;
+  };
+
+const stableReads = (stats: Locator) => {
+  let reads = 0;
+  return async (): Promise<number> => {
+    reads = (await stats.innerText()).includes("Stable") ? reads + 1 : 0;
+    return reads;
+  };
+};
+
+test("should let a solid block land and recover its shape", async ({
+  page,
+}) => {
+  test.setTimeout(SOLID_TEST_TIMEOUT_MS);
+  const stats = await startScene(page, "block");
+
+  await expect
+    .poll(restsWithin(stats, BLOCK_AREA, 0.9, 1.1), { timeout: 70_000 })
+    .toBe(true);
+  await expect(stats).toContainText("Stable");
+});
+
+test("should keep a solid block recognisable in a fluid pool", async ({
+  page,
+}) => {
+  test.setTimeout(SOLID_TEST_TIMEOUT_MS);
+  const stats = await startScene(page, "splash");
+
+  await expect
+    .poll(restsWithin(stats, POOL_BLOCK_AREA, 0.5, 1.5), { timeout: 70_000 })
+    .toBe(true);
+  await expect(stats).toContainText("Stable");
+});
+
+/** Attract leaves a resting block nearly still, so only repel shows the press landing. */
+const POINTER_MODES = [
+  { mode: "attract", minSpeed: 0 },
+  { mode: "repel", minSpeed: 0.2 },
+];
+
+for (const { mode, minSpeed } of POINTER_MODES) {
+  for (const stiffness of ["50", "250"]) {
+    test(`should stay stable while the pointer is held on a solid (${mode}, stiffness ${stiffness})`, async ({
+      page,
+    }) => {
+      test.setTimeout(SOLID_TEST_TIMEOUT_MS);
+      const stats = await startScene(page, "block");
+      await page.getByLabel("Solid stiffness").fill(stiffness);
+      await page.getByLabel("Pointer").selectOption(mode);
+      await page.getByRole("button", { name: "Reset" }).click();
+
+      await expect
+        .poll(async () => restingSolidArea(stats), { timeout: 70_000 })
+        .toBeGreaterThan(0);
+      const canvas = page.getByLabel("Particle simulation");
+      const side = await canvas.evaluate((element) => element.clientWidth);
+      await canvas.hover({ position: { x: side * 0.5, y: side * 0.9 } });
+      await page.mouse.down();
+      await expect
+        .poll(async () => readStat(stats, "Max speed"), { timeout: 10_000 })
+        .toBeGreaterThanOrEqual(minSpeed);
+      await expect
+        .poll(stableReads(stats), { intervals: [500], timeout: 30_000 })
+        .toBeGreaterThanOrEqual(12);
+      await page.mouse.up();
+    });
+  }
+}
 
 test("should explain a browser without WebGPU", async ({ page }) => {
   await page.addInitScript(() => {

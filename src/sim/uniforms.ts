@@ -8,8 +8,8 @@ export interface Pointer {
   pressed: boolean;
 }
 
-/** Size of the WGSL `Params` struct. */
-export const UNIFORM_BYTES = 32;
+/** Size of the WGSL `Params` struct: 36 bytes of fields, rounded up to its 8-byte alignment. */
+export const UNIFORM_BYTES = 40;
 
 const POINTER_SIGN: Record<PointerMode, number> = { attract: 1, repel: -1 };
 
@@ -31,5 +31,6 @@ export const packUniforms = (
   floats[7] = pointer.pressed
     ? POINTER_ACCELERATION * POINTER_SIGN[settings.pointerMode]
     : 0;
+  floats[8] = settings.solidStiffness;
   return buffer;
 };

@@ -4,8 +4,9 @@ Guidance for Claude Code (claude.ai/code) working in this repository.
 
 ## Architecture
 
-The solver is 2D MLS-MPM on WebGPU: a weakly compressible fluid on a 128x128
-grid. `src/sim` knows nothing about React. Its pure parts (`params`, `scenes`,
+The solver is 2D MLS-MPM on WebGPU: a weakly compressible fluid and fixed
+corotated elastic solids on a 128x128 grid, told apart by a per-particle
+material field. `src/sim` knows nothing about React. Its pure parts (`params`, `scenes`,
 `stats`, `uniforms`) are unit-tested; `src/sim/gpu` holds the WGSL shaders and
 the `Simulator` that owns the device, and `SimulationCanvas` owns the frame
 loop. Those two are excluded from coverage because they need a real WebGPU
