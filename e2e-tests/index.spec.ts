@@ -142,13 +142,32 @@ test("should keep a solid block recognisable in a fluid pool", async ({
   await expect(stats).toContainText("Stable");
 });
 
-/** Attract leaves a resting block nearly still, so only repel shows the press landing. */
+const PRESS_AT_BLOCK_CENTRE = { x: 0.5, y: 0.9 };
+/** Beside the resting block, 0.08 from its edge and inside the pointer radius. */
+const PRESS_BESIDE_BLOCK = { x: 0.68, y: 0.9 };
+const PRESS_OUT_OF_REACH = { x: 0.9, y: 0.9 };
+const ATTRACT_REACH_SPEED = 0.3;
+const REPEL_REACH_SPEED = 0.2;
+const RESTING_SPEED_CEILING = 0.2;
+const OUT_OF_REACH_WINDOW_MS = 5_000;
+
+/** Attract pulls a resting block toward its own centre, so only a press beside it moves it. */
 const POINTER_MODES = [
-  { mode: "attract", minSpeed: 0 },
-  { mode: "repel", minSpeed: 0.2 },
+  { mode: "attract", press: PRESS_BESIDE_BLOCK, minSpeed: ATTRACT_REACH_SPEED },
+  { mode: "repel", press: PRESS_AT_BLOCK_CENTRE, minSpeed: REPEL_REACH_SPEED },
 ];
 
-for (const { mode, minSpeed } of POINTER_MODES) {
+const pressOnCanvas = async (
+  page: Page,
+  press: { x: number; y: number },
+): Promise<void> => {
+  const canvas = page.getByLabel("Particle simulation");
+  const side = await canvas.evaluate((element) => element.clientWidth);
+  await canvas.hover({ position: { x: side * press.x, y: side * press.y } });
+  await page.mouse.down();
+};
+
+for (const { mode, press, minSpeed } of POINTER_MODES) {
   for (const stiffness of ["50", "250"]) {
     test(`should stay stable while the pointer is held on a solid (${mode}, stiffness ${stiffness})`, async ({
       page,
@@ -162,10 +181,7 @@ for (const { mode, minSpeed } of POINTER_MODES) {
       await expect
         .poll(async () => restingSolidArea(stats), { timeout: 70_000 })
         .toBeGreaterThan(0);
-      const canvas = page.getByLabel("Particle simulation");
-      const side = await canvas.evaluate((element) => element.clientWidth);
-      await canvas.hover({ position: { x: side * 0.5, y: side * 0.9 } });
-      await page.mouse.down();
+      await pressOnCanvas(page, press);
       await expect
         .poll(async () => readStat(stats, "Max speed"), { timeout: 10_000 })
         .toBeGreaterThanOrEqual(minSpeed);
@@ -176,6 +192,27 @@ for (const { mode, minSpeed } of POINTER_MODES) {
     });
   }
 }
+
+test("should leave a solid block at rest when attract is pressed out of its reach", async ({
+  page,
+}) => {
+  test.setTimeout(SOLID_TEST_TIMEOUT_MS);
+  const stats = await startScene(page, "block");
+  await page.getByLabel("Pointer").selectOption("attract");
+
+  await expect
+    .poll(async () => restingSolidArea(stats), { timeout: 70_000 })
+    .toBeGreaterThan(0);
+  await pressOnCanvas(page, PRESS_OUT_OF_REACH);
+  let peakSpeed = 0;
+  const windowEnd = Date.now() + OUT_OF_REACH_WINDOW_MS;
+  while (Date.now() < windowEnd) {
+    peakSpeed = Math.max(peakSpeed, await readStat(stats, "Max speed"));
+  }
+  await page.mouse.up();
+
+  expect(peakSpeed).toBeLessThan(RESTING_SPEED_CEILING);
+});
 
 test("should explain a browser without WebGPU", async ({ page }) => {
   await page.addInitScript(() => {
