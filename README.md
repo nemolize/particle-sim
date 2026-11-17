@@ -28,13 +28,13 @@ have equal density, so a solid in a pool is neutrally buoyant.
 
 Pick a scene (a dam break, a drop into a pool, two colliding blobs, an elastic
 block landing on the floor, or a block dropped into a pool, straight or tilted), then
-press and drag on the canvas to attract or repel the particles. The side panel
+press and drag on the canvas to attract or repel the particles. The `Settings` button opens a panel that
 changes the fluid and solid stiffness and gravity, pauses, and resets; its statistics are read back
 from the GPU a few times per second.
 
 On a phone or tablet, tilting the device tilts gravity and shaking it pushes the
 fluid, the canvas acting as a container fixed to the screen. The `Motion` toggle
-in the side panel appears on a device that delivers sensor data and turns this
+in the `Settings` panel appears on a device that delivers sensor data and turns this
 off. It starts on where data already arrives; iOS Safari delivers none until you
 turn it on and allow motion access. The browser only delivers sensor data to a
 secure context (HTTPS or `localhost`). The `Gravity`

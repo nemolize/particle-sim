@@ -61,6 +61,16 @@ it("opens and closes the panel with the Settings button", async () => {
   expect(screen.queryByLabelText("Scene")).toBeNull();
 });
 
+it("returns focus to the Settings button when Escape closes the panel", async () => {
+  vi.stubGlobal("navigator", { gpu: {} });
+  const user = userEvent.setup();
+  render(<App />);
+  await openSettings(user);
+  screen.getByLabelText("Scene").focus();
+  await user.keyboard("{Escape}");
+  expect(screen.getByRole("button", { name: "Settings" })).toHaveFocus();
+});
+
 it("keeps the panel open for any key but Escape", async () => {
   vi.stubGlobal("navigator", { gpu: {} });
   const user = userEvent.setup();

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ControlPanel } from "@/ControlPanel";
 import { DEFAULT_SETTINGS, type Settings } from "@/settings";
@@ -25,12 +25,15 @@ const App = () => {
   const [resetToken, setResetToken] = useState(0);
   const [stats, setStats] = useState<Stats>(INITIAL_STATS);
   const [panelOpen, setPanelOpen] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
   const motion = useMotionInput();
 
   useEffect(() => {
     if (!panelOpen) return;
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") setPanelOpen(false);
+      if (event.key !== "Escape") return;
+      setPanelOpen(false);
+      toggleRef.current?.focus();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => {
@@ -40,10 +43,9 @@ const App = () => {
 
   return (
     <main className="relative flex h-dvh w-full items-center justify-center overflow-hidden bg-gray-50">
-      <h1 className="absolute top-4 left-4 z-10 rounded bg-white/80 px-2 text-2xl font-bold text-gray-800">
-        Particle Sim
-      </h1>
+      <h1 className="sr-only text-2xl font-bold text-gray-800">Particle Sim</h1>
       <button
+        ref={toggleRef}
         type="button"
         aria-expanded={panelOpen}
         aria-controls={PANEL_ID}
