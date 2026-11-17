@@ -53,7 +53,7 @@ ${COMMON}
 @group(0) @binding(3) var<storage, read_write> gridVelocity: array<vec2f>;
 
 const MIN_DET: f32 = 0.1;
-// Chosen empirically, no fixed source: without a floor, fluid packed against a wall blows up.
+// Chosen empirically, no fixed source: without a floor on the pressure, fluid packed against a wall blows up.
 const MIN_J: f32 = 0.6;
 
 fn rotationOf(f: mat2x2f) -> mat2x2f {
@@ -108,7 +108,7 @@ fn particleToGrid(@builtin(global_invocation_id) id: vec3u) {
   if (isSolid(p)) {
     kirchhoff = solidStress(p.f);
   } else {
-    let pressure = params.stiffness * (p.j - 1.0);
+    let pressure = params.stiffness * (max(p.j, MIN_J) - 1.0);
     kirchhoff = mat2x2f(pressure, 0.0, 0.0, pressure);
   }
   let affine = (-params.dt * 4.0 * INV_DX * INV_DX) * kirchhoff + p.c;
@@ -184,7 +184,7 @@ fn gridToParticle(@builtin(global_invocation_id) id: vec3u) {
   if (isSolid(p)) {
     p.f = keepInvertible((mat2x2f(1.0, 0.0, 0.0, 1.0) + params.dt * c) * p.f);
   } else {
-    p.j = max(p.j * (1.0 + params.dt * (c[0][0] + c[1][1])), MIN_J);
+    p.j = max(p.j * (1.0 + params.dt * (c[0][0] + c[1][1])), MIN_DET);
   }
   particles[id.x] = p;
 }
