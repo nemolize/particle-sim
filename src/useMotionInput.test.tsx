@@ -141,6 +141,107 @@ describe("with a permission prompt", () => {
     expect(result.current.message).toBeUndefined();
   });
 
+  describe("when no reading follows a granted request", () => {
+    const grant = async () => {
+      stubPermission(() => Promise.resolve("granted"));
+      const hook = renderHook(() => useMotionInput());
+      await act(async () => {
+        hook.result.current.setEnabled(true);
+        await Promise.resolve();
+      });
+      return hook;
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("removes the toggle and turns motion off after 3 s", async () => {
+      const { result } = await grant();
+      act(() => {
+        vi.advanceTimersByTime(2999);
+      });
+      expect(result.current.available).toBe(true);
+      expect(result.current.enabled).toBe(true);
+      act(() => {
+        vi.advanceTimersByTime(1);
+      });
+      expect(result.current.available).toBe(false);
+      expect(result.current.enabled).toBe(false);
+      expect(result.current.readGravity()).toEqual({ x: 0, y: -1 });
+    });
+
+    it("keeps the toggle when a reading arrives within 3 s", async () => {
+      const { result } = await grant();
+      act(() => {
+        vi.advanceTimersByTime(2999);
+      });
+      fire(motionEvent(-9.8, 0));
+      act(() => {
+        vi.advanceTimersByTime(10_000);
+      });
+      expect(result.current.available).toBe(true);
+      expect(result.current.enabled).toBe(true);
+      expect(result.current.readGravity().x).toBeCloseTo(1);
+    });
+
+    it("does not start the clock until motion is on", () => {
+      stubPermission(() => Promise.resolve("granted"));
+      const { result } = renderHook(() => useMotionInput());
+      act(() => {
+        vi.advanceTimersByTime(10_000);
+      });
+      expect(result.current.available).toBe(true);
+    });
+
+    it("stops the clock when turned off again", async () => {
+      const { result } = await grant();
+      act(() => {
+        result.current.setEnabled(false);
+      });
+      act(() => {
+        vi.advanceTimersByTime(10_000);
+      });
+      expect(result.current.available).toBe(true);
+    });
+  });
+
+  describe("when an event arrives with no usable values", () => {
+    it.each([
+      ["motion", () => motionEvent(null, null)],
+      ["orientation", () => orientationEvent(null, null)],
+    ])("removes the toggle at once on an empty %s event", (_name, empty) => {
+      stubPermission(() => Promise.resolve("granted"));
+      const { result } = renderHook(() => useMotionInput());
+      expect(result.current.available).toBe(true);
+      fire(empty());
+      expect(result.current.available).toBe(false);
+      expect(result.current.enabled).toBe(false);
+    });
+
+    it("brings the toggle back when a real reading follows", () => {
+      stubPermission(() => Promise.resolve("granted"));
+      const { result } = renderHook(() => useMotionInput());
+      fire(motionEvent(null, null));
+      fire(orientationEvent(0, 45));
+      expect(result.current.available).toBe(true);
+      expect(result.current.enabled).toBe(true);
+    });
+
+    it("keeps motion on when an empty event follows a real reading", () => {
+      stubPermission(() => Promise.resolve("granted"));
+      const { result } = renderHook(() => useMotionInput());
+      fire(motionEvent(0, 9.8));
+      fire(motionEvent(null, null));
+      expect(result.current.available).toBe(true);
+      expect(result.current.enabled).toBe(true);
+    });
+  });
+
   it("keeps gravity straight down while on but before the first event", async () => {
     stubPermission(() => Promise.resolve("granted"));
     const { result } = renderHook(() => useMotionInput());
