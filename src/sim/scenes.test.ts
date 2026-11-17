@@ -11,9 +11,10 @@ import {
   OFFSET_MATERIAL,
   OFFSET_V,
   OFFSET_X,
+  PARTICLE_SPACING,
   PARTICLE_STRIDE,
 } from "./params";
-import { countParticles, createParticles } from "./scenes";
+import { countParticles, createParticles, TILT_ANGLE } from "./scenes";
 
 it.each(SCENES)(
   "%s: every particle is inside the walls, undeformed",
@@ -83,6 +84,34 @@ it("splash: a solid block above a fluid pool", () => {
   expect(solids).toBeGreaterThan(500);
   expect(fluids).toBeGreaterThan(solids);
   expect(lowestSolid).toBeGreaterThan(highestFluid);
+});
+
+it("tilt: a solid block turned by 30 degrees above a fluid pool", () => {
+  const data = createParticles("tilt");
+  const xs: number[] = [];
+  const ys: number[] = [];
+  let fluids = 0;
+  let highestFluid = -Infinity;
+  for (let i = 0; i < countParticles(data); i++) {
+    const base = i * PARTICLE_STRIDE;
+    const x = data[base + OFFSET_X] ?? Number.NaN;
+    const y = data[base + OFFSET_X + 1] ?? Number.NaN;
+    if (data[base + OFFSET_MATERIAL] === MATERIAL_SOLID) {
+      xs.push(x);
+      ys.push(y);
+    } else {
+      fluids++;
+      highestFluid = Math.max(highestFluid, y);
+    }
+  }
+  const blockArea = xs.length * PARTICLE_SPACING ** 2;
+  expect(blockArea).toBeCloseTo(0.15 ** 2, 3);
+  const box =
+    (Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys));
+  const squareToBox = 1 / (Math.cos(TILT_ANGLE) + Math.sin(TILT_ANGLE)) ** 2;
+  expect(blockArea / box).toBeCloseTo(squareToBox, 1);
+  expect(fluids).toBeGreaterThan(xs.length);
+  expect(Math.min(...ys)).toBeGreaterThan(highestFluid);
 });
 
 it("packs four particles per grid cell", () => {

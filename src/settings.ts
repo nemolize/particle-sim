@@ -1,4 +1,11 @@
-export const SCENES = ["dam", "drop", "collision", "block", "splash"] as const;
+export const SCENES = [
+  "dam",
+  "drop",
+  "collision",
+  "block",
+  "splash",
+  "tilt",
+] as const;
 export type Scene = (typeof SCENES)[number];
 
 export const SCENE_LABELS: Record<Scene, string> = {
@@ -7,6 +14,7 @@ export const SCENE_LABELS: Record<Scene, string> = {
   collision: "Colliding blobs",
   block: "Elastic block",
   splash: "Block in a pool",
+  tilt: "Tilted block in a pool",
 };
 
 export const POINTER_MODES = ["attract", "repel"] as const;

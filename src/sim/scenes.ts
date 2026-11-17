@@ -40,6 +40,34 @@ const disc = (
   material: MATERIAL_FLUID,
 });
 
+export const TILT_ANGLE = Math.PI / 6;
+
+const tiltedSquare = (
+  centre: readonly [number, number],
+  side: number,
+  angle: number,
+  material: number,
+): Blob => {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const half = side / 2;
+  const reach = half * (Math.abs(cos) + Math.abs(sin));
+  return {
+    inside: (x, y) => {
+      const dx = x - centre[0];
+      const dy = y - centre[1];
+      return (
+        Math.abs(cos * dx + sin * dy) <= half &&
+        Math.abs(cos * dy - sin * dx) <= half
+      );
+    },
+    min: [centre[0] - reach, centre[1] - reach],
+    max: [centre[0] + reach, centre[1] + reach],
+    velocity: [0, 0],
+    material,
+  };
+};
+
 const SCENE_BLOBS: Record<Scene, readonly Blob[]> = {
   dam: [rect([0.06, 0.06], [0.42, 0.62])],
   drop: [rect([0.05, 0.05], [0.95, 0.2]), disc([0.5, 0.6], 0.12)],
@@ -51,6 +79,10 @@ const SCENE_BLOBS: Record<Scene, readonly Blob[]> = {
   splash: [
     rect([0.05, 0.05], [0.95, 0.25]),
     rect([0.4, 0.3], [0.55, 0.45], [0, 0], MATERIAL_SOLID),
+  ],
+  tilt: [
+    rect([0.05, 0.05], [0.95, 0.25]),
+    tiltedSquare([0.475, 0.375], 0.15, TILT_ANGLE, MATERIAL_SOLID),
   ],
 };
 
