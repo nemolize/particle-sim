@@ -26,6 +26,8 @@ interface Sensors {
 const DENIED_MESSAGE =
   "Motion access was denied, so gravity stays straight down. Allow motion in the browser's site settings to use it.";
 
+const NO_READING_TIMEOUT_MS = 3000;
+
 const permissionRequest = (): (() => Promise<boolean>) | undefined => {
   if (!("DeviceMotionEvent" in globalThis)) return undefined;
   const request: unknown = Reflect.get(DeviceMotionEvent, "requestPermission");
@@ -47,12 +49,25 @@ export const useMotionInput = (): MotionInput => {
   const [choice, setChoice] = useState<boolean>();
   const [message, setMessage] = useState<string>();
 
-  const enabled = choice ?? heardSensor;
-  const available = heardSensor || needsPermission;
+  const [sensorMissing, setSensorMissing] = useState(false);
+  const noSensor = sensorMissing && !heardSensor;
+
+  const enabled = !noSensor && (choice ?? heardSensor);
+  const available = heardSensor || (needsPermission && !noSensor);
 
   useEffect(() => {
     enabledRef.current = enabled;
   });
+
+  useEffect(() => {
+    if (!needsPermission || choice !== true || heardSensor) return;
+    const timer = setTimeout(() => {
+      setSensorMissing(true);
+    }, NO_READING_TIMEOUT_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [needsPermission, choice, heardSensor]);
 
   useEffect(() => {
     const onMotion = (event: DeviceMotionEvent): void => {
@@ -60,13 +75,19 @@ export const useMotionInput = (): MotionInput => {
         event.accelerationIncludingGravity?.x,
         event.accelerationIncludingGravity?.y,
       );
-      if (reading === undefined) return;
+      if (reading === undefined) {
+        setSensorMissing(true);
+        return;
+      }
       sensors.current.acceleration = reading;
       setHeardSensor(true);
     };
     const onOrientation = (event: DeviceOrientationEvent): void => {
       const orientation = asOrientation(event.beta, event.gamma);
-      if (orientation === undefined) return;
+      if (orientation === undefined) {
+        setSensorMissing(true);
+        return;
+      }
       sensors.current.orientation = orientation;
       setHeardSensor(true);
     };

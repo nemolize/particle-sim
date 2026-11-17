@@ -315,6 +315,15 @@ test("should not blow up when the device is tilted 45 degrees to the right", asy
   expect(peakSpeed).toBeLessThan(TILT_SPEED_CEILING);
 });
 
+test("should not offer Motion on a desktop browser with no motion sensor", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(page.getByLabel("Scene")).toBeVisible();
+
+  await expect(page.getByLabel("Motion")).toHaveCount(0);
+});
+
 test("should explain a browser without WebGPU", async ({ page }) => {
   await page.addInitScript(() => {
     Reflect.deleteProperty(Navigator.prototype, "gpu");
