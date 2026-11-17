@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
+import { SENSOR_G } from "../src/sim/motion";
 import { PARTICLE_SPACING } from "../src/sim/params";
 import { createParticles } from "../src/sim/scenes";
 import { summarize } from "../src/sim/stats";
@@ -238,7 +239,6 @@ test("should leave a solid block at rest when attract is pressed out of its reac
 const GRAVITY_TEST_TIMEOUT_MS = 60_000;
 const SPIKE_COUNT = 10;
 const STABLE_READS_AFTER_SPIKES = 6;
-const SENSOR_G = 9.8;
 
 const sendAccelerations = (
   page: Page,
@@ -256,14 +256,10 @@ const sendAccelerations = (
     }
   }, readings);
 
-/** Chromium asks for sensor permission like iOS Safari does, so the toggle starts off there. */
 const startMotionScene = async (page: Page): Promise<Locator> => {
-  await page.context().grantPermissions(["accelerometer", "gyroscope"]);
   const stats = await startScene(page, "dam");
-  const toggle = page.getByLabel("Motion");
-  await expect(toggle).toBeVisible();
-  if (!(await toggle.isChecked())) await toggle.click();
-  await expect(toggle).toBeChecked();
+  await sendAccelerations(page, [{ x: 0, y: SENSOR_G }]);
+  await expect(page.getByLabel("Motion")).toBeChecked();
   return stats;
 };
 

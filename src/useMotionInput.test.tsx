@@ -120,13 +120,13 @@ describe("with a permission prompt", () => {
     return requestPermission;
   };
 
-  it("shows the toggle off before any event, since none arrive until permitted", () => {
+  it("shows the toggle off before any event, and on once data flows without asking", () => {
     stubPermission(() => Promise.resolve("granted"));
     const { result } = renderHook(() => useMotionInput());
     expect(result.current.available).toBe(true);
     expect(result.current.enabled).toBe(false);
     fire(motionEvent(0, 9.8));
-    expect(result.current.enabled).toBe(false);
+    expect(result.current.enabled).toBe(true);
   });
 
   it("asks when turned on and turns on once granted", async () => {

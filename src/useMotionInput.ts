@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
+  asOrientation,
   asReading,
   GRAVITY_AT_REST,
   gravityFromAcceleration,
   gravityFromOrientation,
+  type Orientation,
   type Vec2,
 } from "@/sim/motion";
 
@@ -18,13 +20,12 @@ export interface MotionInput {
 
 interface Sensors {
   acceleration: Vec2 | undefined;
-  orientation: { beta: number; gamma: number } | undefined;
+  orientation: Orientation | undefined;
 }
 
 const DENIED_MESSAGE =
   "Motion access was denied, so gravity stays straight down. Allow motion in the browser's site settings to use it.";
 
-/** iOS Safari gates sensor events behind a permission asked from a user gesture. */
 const permissionRequest = (): (() => Promise<boolean>) | undefined => {
   if (!("DeviceMotionEvent" in globalThis)) return undefined;
   const request: unknown = Reflect.get(DeviceMotionEvent, "requestPermission");
@@ -46,8 +47,7 @@ export const useMotionInput = (): MotionInput => {
   const [choice, setChoice] = useState<boolean>();
   const [message, setMessage] = useState<string>();
 
-  // Until the user chooses: on where events flow freely, off where permission is asked.
-  const enabled = choice ?? (heardSensor && !needsPermission);
+  const enabled = choice ?? heardSensor;
   const available = heardSensor || needsPermission;
 
   useEffect(() => {
@@ -65,9 +65,9 @@ export const useMotionInput = (): MotionInput => {
       setHeardSensor(true);
     };
     const onOrientation = (event: DeviceOrientationEvent): void => {
-      const reading = asReading(event.beta, event.gamma);
-      if (reading === undefined) return;
-      sensors.current.orientation = { beta: reading.x, gamma: reading.y };
+      const orientation = asOrientation(event.beta, event.gamma);
+      if (orientation === undefined) return;
+      sensors.current.orientation = orientation;
       setHeardSensor(true);
     };
     window.addEventListener("devicemotion", onMotion);
@@ -104,7 +104,7 @@ export const useMotionInput = (): MotionInput => {
       return gravityFromAcceleration(acceleration, angle);
     }
     if (orientation !== undefined) {
-      return gravityFromOrientation(orientation.beta, orientation.gamma, angle);
+      return gravityFromOrientation(orientation, angle);
     }
     return GRAVITY_AT_REST;
   }, []);

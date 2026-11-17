@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  asOrientation,
   asReading,
   gravityFromAcceleration,
   gravityFromOrientation,
@@ -22,6 +23,18 @@ describe("asReading", () => {
     [1, undefined],
   ])("ignores a reading of (%s, %s)", (x, y) => {
     expect(asReading(x, y)).toBeUndefined();
+  });
+});
+
+describe("asOrientation", () => {
+  it("keeps finite beta and gamma", () => {
+    expect(asOrientation(10, -20)).toEqual({ beta: 10, gamma: -20 });
+  });
+
+  it("ignores a missing or non-finite angle", () => {
+    expect(asOrientation(null, 5)).toBeUndefined();
+    expect(asOrientation(5, Number.NaN)).toBeUndefined();
+    expect(asOrientation(undefined, undefined)).toBeUndefined();
   });
 });
 
@@ -98,20 +111,20 @@ describe("gravityFromAcceleration", () => {
 
 describe("gravityFromOrientation", () => {
   it("points an upright device straight down", () => {
-    const tilt = gravityFromOrientation(90, 0, 0);
+    const tilt = gravityFromOrientation({ beta: 90, gamma: 0 }, 0);
     expect(tilt.x).toBeCloseTo(0);
     expect(tilt.y).toBeCloseTo(-1);
   });
 
   it("pulls toward the side tipped down", () => {
-    const right = gravityFromOrientation(0, 45, 0);
+    const right = gravityFromOrientation({ beta: 0, gamma: 45 }, 0);
     expect(right.x).toBeCloseTo(1);
     expect(right.y).toBeCloseTo(0);
-    const left = gravityFromOrientation(0, -45, 0);
+    const left = gravityFromOrientation({ beta: 0, gamma: -45 }, 0);
     expect(left.x).toBeCloseTo(-1);
-    const topDown = gravityFromOrientation(45, 0, 0);
+    const topDown = gravityFromOrientation({ beta: 45, gamma: 0 }, 0);
     expect(topDown.y).toBeCloseTo(-1);
-    const bottomDown = gravityFromOrientation(-45, 0, 0);
+    const bottomDown = gravityFromOrientation({ beta: -45, gamma: 0 }, 0);
     expect(bottomDown.y).toBeCloseTo(1);
   });
 
@@ -121,17 +134,20 @@ describe("gravityFromOrientation", () => {
     [180, { x: -1, y: 0 }],
     [270, { x: 0, y: -1 }],
   ])("rotates the tilt with the screen at angle %s", (angle, expected) => {
-    const tilt = gravityFromOrientation(0, 45, angle);
+    const tilt = gravityFromOrientation({ beta: 0, gamma: 45 }, angle);
     expect(tilt.x).toBeCloseTo(expected.x);
     expect(tilt.y).toBeCloseTo(expected.y);
   });
 
   it("is a unit vector however far the device leans", () => {
-    const tilt = gravityFromOrientation(60, 30, 0);
+    const tilt = gravityFromOrientation({ beta: 60, gamma: 30 }, 0);
     expect(Math.hypot(tilt.x, tilt.y)).toBeCloseTo(1);
   });
 
   it("has no direction for a device lying flat", () => {
-    expect(gravityFromOrientation(0, 0, 0)).toEqual({ x: 0, y: 0 });
+    expect(gravityFromOrientation({ beta: 0, gamma: 0 }, 0)).toEqual({
+      x: 0,
+      y: 0,
+    });
   });
 });

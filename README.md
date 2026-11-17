@@ -35,8 +35,9 @@ from the GPU a few times per second.
 On a phone or tablet, tilting the device tilts gravity and shaking it pushes the
 fluid, the canvas acting as a container fixed to the screen. The `Motion` toggle
 in the side panel appears on a device that delivers sensor data and turns this
-off. iOS Safari asks permission when you turn it on, and the browser only
-delivers sensor data to a secure context (HTTPS or `localhost`). The `Gravity`
+off. It starts on where data already arrives; iOS Safari delivers none until you
+turn it on and allow motion access. The browser only delivers sensor data to a
+secure context (HTTPS or `localhost`). The `Gravity`
 slider keeps its meaning as the strength of 1 g.
 
 It needs a browser with WebGPU, such as a recent Chrome, Edge or Safari. Without
