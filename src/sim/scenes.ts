@@ -40,7 +40,7 @@ const disc = (
   material: MATERIAL_FLUID,
 });
 
-const TILT_ANGLE = Math.PI / 6;
+export const TILT_ANGLE = Math.PI / 6;
 
 const tiltedSquare = (
   centre: readonly [number, number],

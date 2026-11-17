@@ -11,9 +11,10 @@ import {
   OFFSET_MATERIAL,
   OFFSET_V,
   OFFSET_X,
+  PARTICLE_SPACING,
   PARTICLE_STRIDE,
 } from "./params";
-import { countParticles, createParticles } from "./scenes";
+import { countParticles, createParticles, TILT_ANGLE } from "./scenes";
 
 it.each(SCENES)(
   "%s: every particle is inside the walls, undeformed",
@@ -103,15 +104,12 @@ it("tilt: a solid block turned by 30 degrees above a fluid pool", () => {
       highestFluid = Math.max(highestFluid, y);
     }
   }
-  const spacing = CELL_SIZE / 2;
-  const blockArea = xs.length * spacing ** 2;
-  expect(blockArea).toBeCloseTo(0.15 ** 2, 2);
+  const blockArea = xs.length * PARTICLE_SPACING ** 2;
+  expect(blockArea).toBeCloseTo(0.15 ** 2, 3);
   const box =
     (Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys));
-  expect(blockArea / box).toBeCloseTo(
-    1 / (Math.cos(Math.PI / 6) + 0.5) ** 2,
-    1,
-  );
+  const squareToBox = 1 / (Math.cos(TILT_ANGLE) + Math.sin(TILT_ANGLE)) ** 2;
+  expect(blockArea / box).toBeCloseTo(squareToBox, 1);
   expect(fluids).toBeGreaterThan(xs.length);
   expect(Math.min(...ys)).toBeGreaterThan(highestFluid);
 });

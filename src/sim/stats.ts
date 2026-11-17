@@ -14,7 +14,7 @@ export interface Stats {
   /** Mean y of all particles in domain units; 0 is the floor. */
   meanHeight: number;
   maxSpeed: number;
-  /** Solid area from the particles' deformation gradients, so rotation leaves it unchanged; 0 without solids. */
+  /** Current area of the solid particles, Σ det(F) × spacing²; 0 without solids. */
   solidArea: number;
   /** False once any value is not finite or a particle has left the domain. */
   healthy: boolean;
