@@ -209,6 +209,8 @@ test("should leave a solid block at rest when attract is pressed out of its reac
   while (Date.now() < windowEnd) {
     peakSpeed = Math.max(peakSpeed, await readStat(stats, "Max speed"));
   }
+  // A diverged particle drops out of Max speed, so a blow-up would read as rest.
+  await expect(stats).toContainText("Stable");
   await page.mouse.up();
 
   expect(peakSpeed).toBeLessThan(RESTING_SPEED_CEILING);
