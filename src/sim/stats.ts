@@ -14,7 +14,7 @@ export interface Stats {
   /** Mean y of all particles in domain units; 0 is the floor. */
   meanHeight: number;
   maxSpeed: number;
-  /** Area of the box around the solid particles; 0 when there are none. */
+  /** Solid area from the particles' deformation gradients, so rotation leaves it unchanged; 0 without solids. */
   solidArea: number;
   /** False once any value is not finite or a particle has left the domain. */
   healthy: boolean;
@@ -26,10 +26,7 @@ export const summarize = (data: Float32Array): Stats => {
   let heightSum = 0;
   let maxSpeed = 0;
   let healthy = true;
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let minY = Infinity;
-  let maxY = -Infinity;
+  let solidArea = 0;
   for (let i = 0; i < count; i++) {
     const base = i * PARTICLE_STRIDE;
     const x = at(data, base + OFFSET_X);
@@ -39,9 +36,11 @@ export const summarize = (data: Float32Array): Stats => {
       at(data, base + OFFSET_V + 1),
     );
     const solid = at(data, base + OFFSET_MATERIAL) === MATERIAL_SOLID;
-    const deformation = solid
-      ? Math.hypot(...[0, 1, 2, 3].map((k) => at(data, base + OFFSET_F + k)))
-      : 0;
+    const f00 = at(data, base + OFFSET_F);
+    const f10 = at(data, base + OFFSET_F + 1);
+    const f01 = at(data, base + OFFSET_F + 2);
+    const f11 = at(data, base + OFFSET_F + 3);
+    const deformation = solid ? Math.hypot(f00, f10, f01, f11) : 0;
     if (
       !Number.isFinite(x + y + speed + deformation) ||
       x < -PARTICLE_SPACING ||
@@ -54,18 +53,13 @@ export const summarize = (data: Float32Array): Stats => {
     }
     heightSum += y;
     maxSpeed = Math.max(maxSpeed, speed);
-    if (solid) {
-      minX = Math.min(minX, x);
-      maxX = Math.max(maxX, x);
-      minY = Math.min(minY, y);
-      maxY = Math.max(maxY, y);
-    }
+    if (solid) solidArea += (f00 * f11 - f01 * f10) * PARTICLE_SPACING ** 2;
   }
   return {
     count,
     meanHeight: count === 0 ? 0 : heightSum / count,
     maxSpeed,
-    solidArea: maxX >= minX ? (maxX - minX) * (maxY - minY) : 0,
+    solidArea,
     healthy,
   };
 };

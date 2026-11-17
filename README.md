@@ -27,7 +27,7 @@ have equal density, so a solid in a pool is neutrally buoyant.
 ## Using it
 
 Pick a scene (a dam break, a drop into a pool, two colliding blobs, an elastic
-block landing on the floor, or a block dropped into a pool), then
+block landing on the floor, or a block dropped into a pool, straight or tilted), then
 press and drag on the canvas to attract or repel the particles. The side panel
 changes the fluid and solid stiffness and gravity, pauses, and resets; its statistics are read back
 from the GPU a few times per second.

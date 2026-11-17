@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
+import { PARTICLE_SPACING } from "../src/sim/params";
 import { isPreviewTarget } from "./target";
 
 /** A software fallback adapter cannot present to the canvas, so only hardware counts. */
@@ -99,8 +100,12 @@ const restingSolidArea = async (stats: Locator): Promise<number> => {
   return area > 0 && speed < 0.05 ? area : Number.NaN;
 };
 
-const BLOCK_AREA = 0.2 ** 2;
-const POOL_BLOCK_AREA = 0.15 ** 2;
+/** The lattice includes both edges of a block, so it starts a spacing wider than its side. */
+const latticeArea = (side: number): number =>
+  ((Math.floor(side / PARTICLE_SPACING) + 1) * PARTICLE_SPACING) ** 2;
+const BLOCK_AREA = latticeArea(0.2);
+const POOL_BLOCK_AREA = latticeArea(0.15);
+const TILTED_BLOCK_AREA = 0.15 ** 2;
 const SOLID_TEST_TIMEOUT_MS = 150_000;
 
 const restsWithin =
@@ -138,6 +143,18 @@ test("should keep a solid block recognisable in a fluid pool", async ({
 
   await expect
     .poll(restsWithin(stats, POOL_BLOCK_AREA, 0.5, 1.5), { timeout: 70_000 })
+    .toBe(true);
+  await expect(stats).toContainText("Stable");
+});
+
+test("should keep a tilted solid block recognisable in a fluid pool", async ({
+  page,
+}) => {
+  test.setTimeout(SOLID_TEST_TIMEOUT_MS);
+  const stats = await startScene(page, "tilt");
+
+  await expect
+    .poll(restsWithin(stats, TILTED_BLOCK_AREA, 0.5, 1.5), { timeout: 70_000 })
     .toBe(true);
   await expect(stats).toContainText("Stable");
 });

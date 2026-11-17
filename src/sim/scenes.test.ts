@@ -85,6 +85,37 @@ it("splash: a solid block above a fluid pool", () => {
   expect(lowestSolid).toBeGreaterThan(highestFluid);
 });
 
+it("tilt: a solid block turned by 30 degrees above a fluid pool", () => {
+  const data = createParticles("tilt");
+  const xs: number[] = [];
+  const ys: number[] = [];
+  let fluids = 0;
+  let highestFluid = -Infinity;
+  for (let i = 0; i < countParticles(data); i++) {
+    const base = i * PARTICLE_STRIDE;
+    const x = data[base + OFFSET_X] ?? Number.NaN;
+    const y = data[base + OFFSET_X + 1] ?? Number.NaN;
+    if (data[base + OFFSET_MATERIAL] === MATERIAL_SOLID) {
+      xs.push(x);
+      ys.push(y);
+    } else {
+      fluids++;
+      highestFluid = Math.max(highestFluid, y);
+    }
+  }
+  const spacing = CELL_SIZE / 2;
+  const blockArea = xs.length * spacing ** 2;
+  expect(blockArea).toBeCloseTo(0.15 ** 2, 2);
+  const box =
+    (Math.max(...xs) - Math.min(...xs)) * (Math.max(...ys) - Math.min(...ys));
+  expect(blockArea / box).toBeCloseTo(
+    1 / (Math.cos(Math.PI / 6) + 0.5) ** 2,
+    1,
+  );
+  expect(fluids).toBeGreaterThan(xs.length);
+  expect(Math.min(...ys)).toBeGreaterThan(highestFluid);
+});
+
 it("packs four particles per grid cell", () => {
   const count = countParticles(createParticles("dam"));
   const cells = ((0.42 - 0.06) / CELL_SIZE) * ((0.62 - 0.06) / CELL_SIZE);
