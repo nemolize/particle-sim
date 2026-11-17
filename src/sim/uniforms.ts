@@ -1,5 +1,6 @@
 import type { PointerMode, Settings } from "@/settings";
 
+import type { Vec2 } from "./motion";
 import { POINTER_ACCELERATION, POINTER_RADIUS, TIME_STEP } from "./params";
 
 export interface Pointer {
@@ -8,29 +9,33 @@ export interface Pointer {
   pressed: boolean;
 }
 
-/** Size of the WGSL `Params` struct: 36 bytes of fields, rounded up to its 8-byte alignment. */
 export const UNIFORM_BYTES = 40;
 
 const POINTER_SIGN: Record<PointerMode, number> = { attract: 1, repel: -1 };
 
-/** Pack the per-frame parameters in the field order of the WGSL `Params` struct. */
+/**
+ * Pack the per-frame parameters in the field order of the WGSL `Params` struct.
+ * `pull` is gravity in units of 1 g, which `settings.gravity` scales.
+ */
 export const packUniforms = (
   settings: Settings,
   count: number,
   pointer: Pointer,
+  pull: Vec2,
 ): ArrayBuffer => {
   const buffer = new ArrayBuffer(UNIFORM_BYTES);
   const floats = new Float32Array(buffer);
-  floats[0] = settings.gravity;
-  floats[1] = settings.stiffness;
-  floats[2] = TIME_STEP;
-  new Uint32Array(buffer)[3] = count;
-  floats[4] = pointer.x;
-  floats[5] = pointer.y;
-  floats[6] = POINTER_RADIUS;
-  floats[7] = pointer.pressed
+  floats[0] = pull.x * settings.gravity;
+  floats[1] = pull.y * settings.gravity;
+  floats[2] = pointer.x;
+  floats[3] = pointer.y;
+  floats[4] = settings.stiffness;
+  floats[5] = TIME_STEP;
+  new Uint32Array(buffer)[6] = count;
+  floats[7] = POINTER_RADIUS;
+  floats[8] = pointer.pressed
     ? POINTER_ACCELERATION * POINTER_SIGN[settings.pointerMode]
     : 0;
-  floats[8] = settings.solidStiffness;
+  floats[9] = settings.solidStiffness;
   return buffer;
 };

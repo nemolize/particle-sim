@@ -14,10 +14,17 @@ import {
 } from "@/settings";
 import type { Stats } from "@/sim/stats";
 
+export interface MotionControl {
+  enabled: boolean;
+  message: string | undefined;
+  onChange: (enabled: boolean) => void;
+}
+
 interface Props {
   settings: Settings;
   stats: Stats;
   paused: boolean;
+  motion: MotionControl | undefined;
   onChange: (next: Settings) => void;
   onPausedChange: (paused: boolean) => void;
   onReset: () => void;
@@ -39,6 +46,7 @@ export const ControlPanel = ({
   settings,
   stats,
   paused,
+  motion,
   onChange,
   onPausedChange,
   onReset,
@@ -112,6 +120,25 @@ export const ControlPanel = ({
           }}
         />
       </Field>
+      {motion === undefined ? null : (
+        <div className="flex flex-col gap-1">
+          <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+            <input
+              type="checkbox"
+              checked={motion.enabled}
+              onChange={(event) => {
+                motion.onChange(event.target.checked);
+              }}
+            />
+            Motion
+          </label>
+          {motion.message === undefined ? null : (
+            <p role="status" className="text-xs text-red-700">
+              {motion.message}
+            </p>
+          )}
+        </div>
+      )}
     </div>
     <div className="flex gap-2">
       <button

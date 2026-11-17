@@ -1,6 +1,9 @@
 import { expect, type Locator, type Page, test } from "@playwright/test";
 
+import { SENSOR_G } from "../src/sim/motion";
 import { PARTICLE_SPACING } from "../src/sim/params";
+import { createParticles } from "../src/sim/scenes";
+import { summarize } from "../src/sim/stats";
 import { isPreviewTarget } from "./target";
 
 /** A software fallback adapter cannot present to the canvas, so only hardware counts. */
@@ -231,6 +234,85 @@ test("should leave a solid block at rest when attract is pressed out of its reac
   await page.mouse.up();
 
   expect(peakSpeed).toBeLessThan(RESTING_SPEED_CEILING);
+});
+
+const GRAVITY_TEST_TIMEOUT_MS = 60_000;
+const SPIKE_COUNT = 10;
+const STABLE_READS_AFTER_SPIKES = 6;
+
+const sendAccelerations = (
+  page: Page,
+  readings: { x: number; y: number }[],
+): Promise<void> =>
+  page.evaluate(async (readings) => {
+    for (const { x, y } of readings) {
+      window.dispatchEvent(
+        new DeviceMotionEvent("devicemotion", {
+          accelerationIncludingGravity: { x, y, z: 0 },
+        }),
+      );
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+  }, readings);
+
+const startMotionScene = async (page: Page): Promise<Locator> => {
+  const stats = await startScene(page, "dam");
+  await sendAccelerations(page, [{ x: 0, y: SENSOR_G }]);
+  await expect(page.getByLabel("Motion")).toBeChecked();
+  return stats;
+};
+
+test("should lift the fluid when the device is turned upside down", async ({
+  page,
+}) => {
+  test.setTimeout(GRAVITY_TEST_TIMEOUT_MS);
+  const stats = await startMotionScene(page);
+  const startHeight = summarize(createParticles("dam")).meanHeight;
+
+  await sendAccelerations(page, [{ x: 0, y: -SENSOR_G }]);
+  await expect
+    .poll(async () => readStat(stats, "Mean height"), { timeout: 30_000 })
+    .toBeGreaterThan(startHeight + 0.05);
+  await expect(stats).toContainText("Stable");
+});
+
+test("should stay stable under alternating 10 g spikes", async ({ page }) => {
+  test.setTimeout(GRAVITY_TEST_TIMEOUT_MS);
+  const stats = await startMotionScene(page);
+
+  const spikes = Array.from({ length: SPIKE_COUNT }, (_, index) => ({
+    x: 0,
+    y: (index % 2 === 0 ? 1 : -1) * 10 * SENSOR_G,
+  }));
+  await sendAccelerations(page, spikes);
+  await expect
+    .poll(stableReads(stats), { intervals: [500], timeout: 30_000 })
+    .toBeGreaterThanOrEqual(STABLE_READS_AFTER_SPIKES);
+});
+
+const TILT_WINDOW_MS = 5_000;
+/** A blow-up reads in the thousands; a fluid hitting a wall reads in the tens. */
+const TILT_SPEED_CEILING = 100;
+
+test("should not blow up when the device is tilted 45 degrees to the right", async ({
+  page,
+}) => {
+  test.setTimeout(GRAVITY_TEST_TIMEOUT_MS);
+  const stats = await startMotionScene(page);
+
+  const side = SENSOR_G * Math.SQRT1_2;
+  await sendAccelerations(page, [{ x: -side, y: side }]);
+  // The column of water is still standing when gravity swings sideways.
+  await page.getByRole("button", { name: "Reset" }).click();
+  let peakSpeed = 0;
+  const windowEnd = Date.now() + TILT_WINDOW_MS;
+  while (Date.now() < windowEnd) {
+    peakSpeed = Math.max(peakSpeed, await readStat(stats, "Max speed"));
+  }
+  await expect(stats).toContainText("Stable");
+
+  expect(peakSpeed).toBeLessThan(TILT_SPEED_CEILING);
 });
 
 test("should explain a browser without WebGPU", async ({ page }) => {

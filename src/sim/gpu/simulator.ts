@@ -1,5 +1,6 @@
 import type { Settings } from "@/settings";
 
+import type { Vec2 } from "../motion";
 import { GRID_SIZE, PARTICLE_STRIDE, SUBSTEPS_PER_FRAME } from "../params";
 import { countParticles, createParticles } from "../scenes";
 import { type Stats, summarize } from "../stats";
@@ -186,13 +187,14 @@ export class Simulator {
   }
 
   /**
-   * Advance one rendered frame and draw it. With `readStats`, the particle
-   * buffer is copied back and summarised; resolves undefined when a previous
+   * Advance one rendered frame under gravity `pull` (units of 1 g) and draw it.
+   * With `readStats`, the particle buffer is copied back and summarised; resolves undefined when a previous
    * read is still pending or nothing was requested.
    */
   async frame(
     settings: Settings,
     pointer: Pointer,
+    pull: Vec2,
     options: { step: boolean; readStats: boolean },
   ): Promise<Stats | undefined> {
     const { scenario } = this;
@@ -201,7 +203,7 @@ export class Simulator {
     this.device.queue.writeBuffer(
       this.uniforms,
       0,
-      packUniforms(settings, scenario.count, pointer),
+      packUniforms(settings, scenario.count, pointer, pull),
     );
     const encoder = this.device.createCommandEncoder();
 

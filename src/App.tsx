@@ -4,6 +4,7 @@ import { ControlPanel } from "@/ControlPanel";
 import { DEFAULT_SETTINGS, type Settings } from "@/settings";
 import type { Stats } from "@/sim/stats";
 import { SimulationCanvas } from "@/SimulationCanvas";
+import { useMotionInput } from "@/useMotionInput";
 
 const INITIAL_STATS: Stats = {
   count: 0,
@@ -21,6 +22,7 @@ const App = () => {
   const [paused, setPaused] = useState(false);
   const [resetToken, setResetToken] = useState(0);
   const [stats, setStats] = useState<Stats>(INITIAL_STATS);
+  const motion = useMotionInput();
 
   return (
     <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-4 bg-gray-50 p-4 md:flex-row md:items-start">
@@ -32,6 +34,7 @@ const App = () => {
             paused={paused}
             resetToken={resetToken}
             onStats={setStats}
+            readGravity={motion.readGravity}
           />
         ) : (
           <p role="alert" className="rounded bg-amber-50 p-4 text-amber-900">
@@ -43,6 +46,15 @@ const App = () => {
         settings={settings}
         stats={stats}
         paused={paused}
+        motion={
+          motion.available
+            ? {
+                enabled: motion.enabled,
+                message: motion.message,
+                onChange: motion.setEnabled,
+              }
+            : undefined
+        }
         onChange={setSettings}
         onPausedChange={setPaused}
         onReset={() => {

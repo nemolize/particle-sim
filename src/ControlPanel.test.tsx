@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 
-import { ControlPanel } from "./ControlPanel";
+import { ControlPanel, type MotionControl } from "./ControlPanel";
 import { DEFAULT_SETTINGS } from "./settings";
 import type { Stats } from "./sim/stats";
 
@@ -14,7 +14,11 @@ const STATS: Stats = {
   healthy: true,
 };
 
-const setup = (stats: Stats = STATS, paused = false) => {
+const setup = (
+  stats: Stats = STATS,
+  paused = false,
+  motion?: MotionControl,
+) => {
   const onChange = vi.fn();
   const onPausedChange = vi.fn();
   const onReset = vi.fn();
@@ -23,6 +27,7 @@ const setup = (stats: Stats = STATS, paused = false) => {
       settings={DEFAULT_SETTINGS}
       stats={stats}
       paused={paused}
+      motion={motion}
       onChange={onChange}
       onPausedChange={onPausedChange}
       onReset={onReset}
@@ -106,4 +111,34 @@ it("names a diverged run", () => {
   expect(screen.getByLabelText("Simulation statistics")).toHaveTextContent(
     "Diverged",
   );
+});
+
+it("hides the Motion toggle on a device without sensors", () => {
+  setup();
+  expect(screen.queryByLabelText("Motion")).toBeNull();
+});
+
+it("reports the Motion toggle and shows why it could not turn on", async () => {
+  const user = userEvent.setup();
+  const onChange = vi.fn();
+  setup(STATS, false, {
+    enabled: true,
+    message: "Motion was denied",
+    onChange,
+  });
+  const toggle = screen.getByLabelText("Motion");
+  expect(toggle).toBeChecked();
+  await user.click(toggle);
+  expect(onChange).toHaveBeenCalledWith(false);
+  expect(screen.getByRole("status")).toHaveTextContent("Motion was denied");
+});
+
+it("shows no status message while there is nothing to say", () => {
+  setup(STATS, false, {
+    enabled: false,
+    message: undefined,
+    onChange: vi.fn(),
+  });
+  expect(screen.getByLabelText("Motion")).not.toBeChecked();
+  expect(screen.queryByRole("status")).toBeNull();
 });
