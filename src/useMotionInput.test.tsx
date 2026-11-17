@@ -96,11 +96,11 @@ describe("without a permission prompt", () => {
 
   it("falls back to the orientation tilt only until an acceleration arrives", () => {
     const { result } = renderHook(() => useMotionInput());
-    fire(orientationEvent(0, 45));
+    fire(orientationEvent(0, 90));
     expect(result.current.available).toBe(true);
     expect(result.current.readGravity().x).toBeCloseTo(1);
     fire(motionEvent(0, 9.8));
-    fire(orientationEvent(0, 45));
+    fire(orientationEvent(0, 90));
     expect(result.current.readGravity().x).toBeCloseTo(0);
     expect(result.current.readGravity().y).toBeCloseTo(-1);
   });
