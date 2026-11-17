@@ -2,6 +2,7 @@ import {
   CELL_SIZE,
   FIXED_POINT_SCALE,
   GRID_SIZE,
+  MATERIAL_SOLID,
   PARTICLE_SPACING,
 } from "../params";
 
@@ -17,6 +18,7 @@ struct Params {
   pointer: vec2f,
   pointerRadius: f32,
   pointerAccel: f32,
+  solidStiffness: f32,
 }
 
 struct Particle {
@@ -24,6 +26,8 @@ struct Particle {
   v: vec2f,
   c: mat2x2f,
   j: f32,
+  material: f32,
+  f: mat2x2f,
 }
 
 const GRID: u32 = ${String(GRID_SIZE)}u;
@@ -32,6 +36,11 @@ const GRID_F: f32 = ${f(GRID_SIZE)};
 const DX: f32 = ${f(CELL_SIZE)};
 const INV_DX: f32 = ${f(GRID_SIZE)};
 const FIXED: f32 = ${f(FIXED_POINT_SCALE)};
+const SOLID: f32 = ${f(MATERIAL_SOLID)};
+
+fn isSolid(p: Particle) -> bool {
+  return p.material > 0.5 * SOLID;
+}
 `;
 
 export const COMPUTE_SHADER = /* wgsl */ `
@@ -42,6 +51,29 @@ ${COMMON}
 // Per cell: mass, momentum x, momentum y, as fixed-point i32 so atomicAdd can sum them.
 @group(0) @binding(2) var<storage, read_write> grid: array<atomic<i32>>;
 @group(0) @binding(3) var<storage, read_write> gridVelocity: array<vec2f>;
+
+const MIN_DET: f32 = 0.1;
+
+fn rotationOf(f: mat2x2f) -> mat2x2f {
+  let cosine = f[0][0] + f[1][1];
+  let sine = f[0][1] - f[1][0];
+  let norm = length(vec2f(cosine, sine));
+  if (norm < 1e-6) { return mat2x2f(1.0, 0.0, 0.0, 1.0); }
+  return mat2x2f(cosine / norm, sine / norm, -sine / norm, cosine / norm);
+}
+
+// Fixed corotated elasticity, Kirchhoff stress P F^T, with equal Lame parameters.
+fn solidStress(f: mat2x2f) -> mat2x2f {
+  let j = determinant(f);
+  let volumetric = params.solidStiffness * (j - 1.0) * j;
+  return 2.0 * params.solidStiffness * (f - rotationOf(f)) * transpose(f)
+    + mat2x2f(volumetric, 0.0, 0.0, volumetric);
+}
+
+fn keepInvertible(f: mat2x2f) -> mat2x2f {
+  if (determinant(f) >= MIN_DET) { return f; }
+  return sqrt(MIN_DET) * rotationOf(f);
+}
 
 // Quadratic B-spline weights of the three grid nodes a particle touches, per axis.
 fn weights(fx: vec2f) -> array<vec2f, 3> {
@@ -70,9 +102,14 @@ fn particleToGrid(@builtin(global_invocation_id) id: vec3u) {
   let fx = xg - vec2f(base);
   var w = weights(fx);
 
-  // Weakly compressible fluid: pressure from the volume ratio J.
-  let stress = -params.dt * 4.0 * params.stiffness * (p.j - 1.0) * INV_DX * INV_DX;
-  let affine = mat2x2f(stress, 0.0, 0.0, stress) + p.c;
+  var kirchhoff = mat2x2f(0.0, 0.0, 0.0, 0.0);
+  if (isSolid(p)) {
+    kirchhoff = solidStress(p.f);
+  } else {
+    let pressure = params.stiffness * (p.j - 1.0);
+    kirchhoff = mat2x2f(pressure, 0.0, 0.0, pressure);
+  }
+  let affine = (-params.dt * 4.0 * INV_DX * INV_DX) * kirchhoff + p.c;
 
   for (var a = 0; a < 3; a++) {
     for (var b = 0; b < 3; b++) {
@@ -142,7 +179,11 @@ fn gridToParticle(@builtin(global_invocation_id) id: vec3u) {
   p.c = c;
   // Keeps the 3x3 stencil inside the grid even if a particle slips into the wall cells.
   p.x = clamp(p.x + params.dt * velocity, vec2f(2.0 * DX), vec2f(1.0 - 2.0 * DX));
-  p.j = p.j * (1.0 + params.dt * (c[0][0] + c[1][1]));
+  if (isSolid(p)) {
+    p.f = keepInvertible((mat2x2f(1.0, 0.0, 0.0, 1.0) + params.dt * c) * p.f);
+  } else {
+    p.j = p.j * (1.0 + params.dt * (c[0][0] + c[1][1]));
+  }
   particles[id.x] = p;
 }
 `;
@@ -156,6 +197,7 @@ struct Vertex {
   @builtin(position) position: vec4f,
   @location(0) corner: vec2f,
   @location(1) speed: f32,
+  @location(2) @interpolate(flat) solid: f32,
 }
 
 const RADIUS: f32 = ${f(PARTICLE_SPACING * 1.5)};
@@ -174,6 +216,7 @@ fn vertexMain(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) 
   out.position = vec4f(centre + corner * RADIUS * 2.0, 0.0, 1.0);
   out.corner = corner;
   out.speed = length(p.v);
+  out.solid = select(0.0, 1.0, isSolid(p));
   return out;
 }
 
@@ -182,7 +225,9 @@ fn fragmentMain(in: Vertex) -> @location(0) vec4f {
   let r = length(in.corner);
   if (r > 1.0) { discard; }
   let t = clamp(in.speed / 4.0, 0.0, 1.0);
-  let colour = mix(vec3f(0.12, 0.42, 0.95), vec3f(0.85, 0.97, 1.0), t);
+  let fluid = mix(vec3f(0.12, 0.42, 0.95), vec3f(0.85, 0.97, 1.0), t);
+  let solid = mix(vec3f(0.95, 0.5, 0.1), vec3f(1.0, 0.9, 0.55), t);
+  let colour = mix(fluid, solid, in.solid);
   return vec4f(colour * (1.0 - 0.25 * r * r), 1.0);
 }
 `;

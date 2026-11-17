@@ -9,6 +9,7 @@ const INITIAL_STATS: Stats = {
   count: 0,
   meanHeight: 0,
   maxSpeed: 0,
+  solidArea: 0,
   healthy: true,
 };
 

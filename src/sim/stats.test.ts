@@ -1,10 +1,24 @@
 import { expect, it } from "vitest";
 
-import { OFFSET_V, OFFSET_X, PARTICLE_STRIDE } from "./params";
+import {
+  MATERIAL_SOLID,
+  OFFSET_F,
+  OFFSET_MATERIAL,
+  OFFSET_V,
+  OFFSET_X,
+  PARTICLE_STRIDE,
+} from "./params";
 import { summarize } from "./stats";
 
 const buffer = (
-  particles: { x: number; y: number; vx?: number; vy?: number }[],
+  particles: {
+    x: number;
+    y: number;
+    vx?: number;
+    vy?: number;
+    solid?: boolean;
+    f?: number;
+  }[],
 ): Float32Array => {
   const data = new Float32Array(particles.length * PARTICLE_STRIDE);
   particles.forEach((p, i) => {
@@ -12,6 +26,10 @@ const buffer = (
     data[i * PARTICLE_STRIDE + OFFSET_X + 1] = p.y;
     data[i * PARTICLE_STRIDE + OFFSET_V] = p.vx ?? 0;
     data[i * PARTICLE_STRIDE + OFFSET_V + 1] = p.vy ?? 0;
+    data[i * PARTICLE_STRIDE + OFFSET_MATERIAL] =
+      p.solid === true ? MATERIAL_SOLID : 0;
+    data[i * PARTICLE_STRIDE + OFFSET_F] = p.f ?? 1;
+    data[i * PARTICLE_STRIDE + OFFSET_F + 3] = 1;
   });
   return data;
 };
@@ -34,6 +52,7 @@ it("reports an empty buffer as healthy and flat", () => {
     count: 0,
     meanHeight: 0,
     maxSpeed: 0,
+    solidArea: 0,
     healthy: true,
   });
 });
@@ -50,4 +69,33 @@ it.each([
   expect(stats.healthy).toBe(false);
   expect(stats.meanHeight).toBeCloseTo(0.25);
   expect(stats.maxSpeed).toBeCloseTo(1);
+});
+
+it("measures the box around the solid particles only", () => {
+  const stats = summarize(
+    buffer([
+      { x: 0.2, y: 0.3, solid: true },
+      { x: 0.5, y: 0.4, solid: true },
+      { x: 0.9, y: 0.9 },
+    ]),
+  );
+  expect(stats.solidArea).toBeCloseTo(0.3 * 0.1);
+});
+
+it("reports no solid area without solids", () => {
+  expect(summarize(buffer([{ x: 0.5, y: 0.5 }])).solidArea).toBe(0);
+});
+
+it("flags a solid whose deformation gradient is not finite", () => {
+  const stats = summarize(
+    buffer([{ x: 0.5, y: 0.5, solid: true, f: Number.NaN }]),
+  );
+  expect(stats.healthy).toBe(false);
+  expect(stats.solidArea).toBe(0);
+});
+
+it("ignores the deformation gradient of a fluid particle", () => {
+  expect(summarize(buffer([{ x: 0.5, y: 0.5, f: Number.NaN }])).healthy).toBe(
+    true,
+  );
 });

@@ -12,13 +12,18 @@ const PARTICLES_PER_CELL_SIDE = 2;
 export const PARTICLE_SPACING = CELL_SIZE / PARTICLES_PER_CELL_SIDE;
 
 /**
- * Floats per particle, matching the WGSL `Particle` struct:
- * x(2) v(2) C(4, column-major) J(1) + 1 padding to the 8-byte struct alignment.
+ * Floats per particle, matching the WGSL `Particle` struct: x(2) v(2) C(4) J(1)
+ * material(1) F(4), matrices column-major. A fluid ignores F, a solid ignores J.
  */
-export const PARTICLE_STRIDE = 10;
+export const PARTICLE_STRIDE = 14;
 export const OFFSET_X = 0;
 export const OFFSET_V = 2;
 export const OFFSET_J = 8;
+export const OFFSET_MATERIAL = 9;
+export const OFFSET_F = 10;
+
+export const MATERIAL_FLUID = 0;
+export const MATERIAL_SOLID = 1;
 
 /** Radius of the pointer's influence, as a fraction of the domain. */
 export const POINTER_RADIUS = 0.12;

@@ -10,6 +10,7 @@ const STATS: Stats = {
   count: 1234,
   meanHeight: 0.25,
   maxSpeed: 2,
+  solidArea: 0.04,
   healthy: true,
 };
 
@@ -43,12 +44,19 @@ it("reports each setting change with the rest unchanged", async () => {
     ...DEFAULT_SETTINGS,
     pointerMode: "repel",
   });
-  fireEvent.change(screen.getByLabelText(/^Stiffness/), {
+  fireEvent.change(screen.getByLabelText(/^Fluid stiffness/), {
     target: { value: "600" },
   });
   expect(onChange).toHaveBeenLastCalledWith({
     ...DEFAULT_SETTINGS,
     stiffness: 600,
+  });
+  fireEvent.change(screen.getByLabelText(/^Solid stiffness/), {
+    target: { value: "200" },
+  });
+  expect(onChange).toHaveBeenLastCalledWith({
+    ...DEFAULT_SETTINGS,
+    solidStiffness: 200,
   });
   fireEvent.change(screen.getByLabelText(/^Gravity/), {
     target: { value: "5" },
@@ -89,6 +97,7 @@ it("shows the statistics and flags a diverged run", () => {
   const stats = screen.getByLabelText("Simulation statistics");
   expect(stats).toHaveTextContent("1234");
   expect(stats).toHaveTextContent("0.250");
+  expect(stats).toHaveTextContent("0.040");
   expect(stats).toHaveTextContent("Stable");
 });
 
