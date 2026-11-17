@@ -318,7 +318,8 @@ test("should not blow up when the device is tilted 45 degrees to the right", asy
 test("should not offer Motion on a desktop browser with no motion sensor", async ({
   page,
 }) => {
-  await startScene(page, "dam");
+  await page.goto("/");
+  await expect(page.getByLabel("Scene")).toBeVisible();
 
   await expect(page.getByLabel("Motion")).toHaveCount(0);
 });
