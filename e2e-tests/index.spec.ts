@@ -14,8 +14,15 @@ const hasUsableWebGpu = (page: Page): Promise<boolean> =>
     return adapter !== null && !adapter.info.isFallbackAdapter;
   });
 
+const openSettings = async (page: Page): Promise<void> => {
+  const toggle = page.getByRole("button", { name: "Settings" });
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+};
+
 test("should load the simulator page with its controls", async ({ page }) => {
   await page.goto("/");
+  await openSettings(page);
 
   await expect(page).toHaveTitle("Particle Sim");
   await expect(
@@ -31,6 +38,7 @@ test("should run the dam break without diverging", async ({ page }) => {
     !(await hasUsableWebGpu(page)),
     "no hardware WebGPU in this browser",
   );
+  await openSettings(page);
 
   const canvas = page.getByLabel("Particle simulation");
   await expect(canvas).toHaveAttribute("data-ready", "true", {
@@ -59,6 +67,7 @@ test("should rebuild the scene when Reset is pressed", async ({ page }) => {
     !(await hasUsableWebGpu(page)),
     "no hardware WebGPU in this browser",
   );
+  await openSettings(page);
 
   await expect(page.getByLabel("Particle simulation")).toHaveAttribute(
     "data-ready",
@@ -80,6 +89,7 @@ const startScene = async (page: Page, scene: string): Promise<Locator> => {
     !(await hasUsableWebGpu(page)),
     "no hardware WebGPU in this browser",
   );
+  await openSettings(page);
   await expect(page.getByLabel("Particle simulation")).toHaveAttribute(
     "data-ready",
     "true",
@@ -319,9 +329,52 @@ test("should not offer Motion on a desktop browser with no motion sensor", async
   page,
 }) => {
   await page.goto("/");
+  await openSettings(page);
   await expect(page.getByLabel("Scene")).toBeVisible();
 
   await expect(page.getByLabel("Motion")).toHaveCount(0);
+});
+
+for (const viewport of [
+  { width: 1280, height: 720 },
+  { width: 390, height: 844 },
+]) {
+  test(`should fill the ${String(viewport.width)}x${String(viewport.height)} viewport with a square canvas and no scroll`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    await expect(page.getByLabel("Scene")).toHaveCount(0);
+
+    const side = Math.min(viewport.width, viewport.height);
+    const canvas = page.getByLabel("Particle simulation");
+    const box = await canvas.boundingBox();
+    expect(box?.width).toBeCloseTo(side, 0);
+    expect(box?.height).toBeCloseTo(side, 0);
+
+    await openSettings(page);
+    const opened = await canvas.boundingBox();
+    expect(opened).toEqual(box);
+    const scrolls = await page.evaluate(
+      () =>
+        document.documentElement.scrollHeight >
+          document.documentElement.clientHeight ||
+        document.documentElement.scrollWidth >
+          document.documentElement.clientWidth,
+    );
+    expect(scrolls).toBe(false);
+  });
+}
+
+test("should close the settings panel on Escape", async ({ page }) => {
+  await page.goto("/");
+  await openSettings(page);
+  await page.keyboard.press("Escape");
+  await expect(page.getByLabel("Scene")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Settings" })).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
 });
 
 test("should explain a browser without WebGPU", async ({ page }) => {

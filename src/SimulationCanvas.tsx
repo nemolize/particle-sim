@@ -145,15 +145,18 @@ export const SimulationCanvas = ({
   }, [ready, scene, resetToken]);
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="relative size-full">
       <canvas
         ref={canvasRef}
         aria-label="Particle simulation"
         data-ready={ready}
-        className="aspect-square w-full touch-none rounded-lg bg-slate-900"
+        className="size-full touch-none bg-slate-900"
       />
       {failed ? (
-        <p role="alert" className="text-sm text-red-700">
+        <p
+          role="alert"
+          className="absolute inset-x-0 bottom-0 bg-white/90 p-2 text-sm text-red-700"
+        >
           WebGPU could not start on this device.
         </p>
       ) : null}
