@@ -143,7 +143,7 @@ export const ControlPanel = ({
       <dd className="text-right">{stats.healthy ? "Stable" : "Diverged"}</dd>
     </dl>
     <p className="text-xs text-gray-500">
-      Press and drag on the particles to {settings.pointerMode} it.
+      Press and drag on the particles to {settings.pointerMode} them.
     </p>
   </aside>
 );
