@@ -1,0 +1,14 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  // Not npm packages: cloudflared comes from the host, zizmor from mise.toml.
+  "ignoreBinaries": ["cloudflared", "zizmor"],
+  "workspaces": {
+    ".": {
+      "project": ["**/*.{js,cjs,mjs,jsx,ts,cts,mts,tsx,css}"],
+    },
+    // The Deploy job runs it through wrangler-action; nothing imports it.
+    "deploy": {
+      "ignoreDependencies": ["wrangler"],
+    },
+  },
+}
