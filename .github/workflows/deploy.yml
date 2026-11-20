@@ -27,7 +27,7 @@ jobs:
     steps:
       - if: ${{ github.event_name == 'pull_request' }}
         name: Show wip message in the PR description
-        uses: nemolize/actions/upsert@v1.4.1
+        uses: nemolize/actions/upsert@v1.5.0
         with:
           marker: preview-url
           body: "Version Preview URL: ⏳deployment is in progress..."
@@ -36,7 +36,7 @@ jobs:
         with:
           # Keeps GITHUB_TOKEN out of .git/config, where build code could read it.
           persist-credentials: false
-      - uses: nemolize/actions/setup@v1.4.1
+      - uses: nemolize/actions/setup@v1.5.0
 
       - run: pnpm run build
 
@@ -66,7 +66,7 @@ jobs:
 
       - if: ${{ failure() && github.event_name == 'pull_request' }}
         name: Show build error in the PR description
-        uses: nemolize/actions/upsert@v1.4.1
+        uses: nemolize/actions/upsert@v1.5.0
         with:
           marker: preview-url
           body: "Version Preview URL: ❌deployment failed during build."
@@ -110,7 +110,7 @@ jobs:
     if: ${{ failure() && github.event_name == 'pull_request' }}
 
     steps:
-      - uses: nemolize/actions/upsert@v1.4.1
+      - uses: nemolize/actions/upsert@v1.5.0
         with:
           marker: preview-url
           body: "Version Preview URL: ❌deployment failed: the artifact storage hosts could not be read from GitHub."
@@ -222,14 +222,14 @@ jobs:
 
       - if: ${{ github.event_name == 'pull_request' }}
         name: Show version preview URL in the PR description
-        uses: nemolize/actions/upsert@v1.4.1
+        uses: nemolize/actions/upsert@v1.5.0
         with:
           marker: preview-url
           body: "Version Preview URL: ${{ steps.deploy.outputs.deployment-url || '⚠️ no URL returned — is the workers.dev subdomain enabled?' }}"
 
       - if: ${{ failure() && github.event_name == 'pull_request' }}
         name: Show error message in the PR description
-        uses: nemolize/actions/upsert@v1.4.1
+        uses: nemolize/actions/upsert@v1.5.0
         with:
           marker: preview-url
           body: "Version Preview URL: ❌deployment failed."
