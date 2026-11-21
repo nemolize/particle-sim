@@ -1,7 +1,8 @@
 import type { PointerMode, Settings } from "@/settings";
 
 import type { Vec2 } from "./motion";
-import { POINTER_ACCELERATION, POINTER_RADIUS, TIME_STEP } from "./params";
+import { POINTER_ACCELERATION, POINTER_RADIUS } from "./params";
+import { timeStepFor } from "./timestep";
 
 export interface Pointer {
   x: number;
@@ -30,7 +31,7 @@ export const packUniforms = (
   floats[2] = pointer.x;
   floats[3] = pointer.y;
   floats[4] = settings.stiffness;
-  floats[5] = TIME_STEP;
+  floats[5] = timeStepFor(settings.stiffness);
   new Uint32Array(buffer)[6] = count;
   floats[7] = POINTER_RADIUS;
   floats[8] = pointer.pressed

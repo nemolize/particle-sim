@@ -1,9 +1,10 @@
 import { expect, it } from "vitest";
 
-import { DEFAULT_SETTINGS } from "@/settings";
+import { DEFAULT_SETTINGS, STIFFNESS_RANGE } from "@/settings";
 
 import { GRAVITY_AT_REST } from "./motion";
-import { POINTER_ACCELERATION, POINTER_RADIUS, TIME_STEP } from "./params";
+import { POINTER_ACCELERATION, POINTER_RADIUS } from "./params";
+import { timeStepFor } from "./timestep";
 import { packUniforms, UNIFORM_BYTES } from "./uniforms";
 
 const pack = (pressed: boolean, pointerMode = DEFAULT_SETTINGS.pointerMode) => {
@@ -24,7 +25,7 @@ it("matches the field order of the WGSL Params struct", () => {
   expect(floats[2]).toBeCloseTo(0.3);
   expect(floats[3]).toBeCloseTo(0.7);
   expect(floats[4]).toBe(DEFAULT_SETTINGS.stiffness);
-  expect(floats[5]).toBeCloseTo(TIME_STEP);
+  expect(floats[5]).toBeCloseTo(timeStepFor(DEFAULT_SETTINGS.stiffness), 8);
   expect(uints[6]).toBe(12345);
   expect(floats[7]).toBeCloseTo(POINTER_RADIUS);
   expect(floats[8]).toBe(POINTER_ACCELERATION);
@@ -59,4 +60,16 @@ it("carries the solid stiffness of the settings it is given", () => {
 it("flips the pointer force to repel and switches it off when released", () => {
   expect(pack(true, "repel").floats[8]).toBe(-POINTER_ACCELERATION);
   expect(pack(false).floats[8]).toBe(0);
+});
+
+it("packs a shorter time step for a stiffer fluid", () => {
+  const buffer = packUniforms(
+    { ...DEFAULT_SETTINGS, stiffness: STIFFNESS_RANGE.max },
+    1,
+    { x: 0, y: 0, pressed: false },
+    GRAVITY_AT_REST,
+  );
+  const dt = new Float32Array(buffer)[5];
+  expect(dt).toBeCloseTo(timeStepFor(STIFFNESS_RANGE.max), 8);
+  expect(dt).toBeLessThan(timeStepFor(DEFAULT_SETTINGS.stiffness));
 });
