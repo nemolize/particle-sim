@@ -35,3 +35,9 @@ it("starts a fresh window after each report", () => {
   expect(timing?.fps).toBeCloseTo(4);
   expect(timing?.processingMs).toBeCloseTo(2);
 });
+
+it("reports zero processing time when no frame in the window was timed", () => {
+  const meter = new FrameMeter(500);
+  meter.record(0, undefined);
+  expect(meter.record(500, undefined)?.processingMs).toBe(0);
+});
