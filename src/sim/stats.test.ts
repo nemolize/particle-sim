@@ -9,7 +9,9 @@ import {
   PARTICLE_SPACING,
   PARTICLE_STRIDE,
 } from "./params";
-import { summarize } from "./stats";
+import { summarize as summarizeIn } from "./stats";
+
+const summarize = (data: Float32Array) => summarizeIn(data, 1);
 
 const buffer = (
   particles: {
@@ -137,4 +139,10 @@ it("ignores the deformation gradient of a fluid particle", () => {
     summarize(buffer([{ x: 0.5, y: 0.5, matrix: [Number.NaN, 0, 0, 1] }]))
       .healthy,
   ).toBe(true);
+});
+
+it("accepts a particle beyond the unit square when the domain is wider", () => {
+  const data = buffer([{ x: 1.5, y: 0.5 }]);
+  expect(summarizeIn(data, 2).healthy).toBe(true);
+  expect(summarizeIn(data, 1).healthy).toBe(false);
 });

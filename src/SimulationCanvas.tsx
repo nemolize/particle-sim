@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { Settings } from "@/settings";
+import { domainWidthFor, gridColumnsFor } from "@/sim/domain";
 import { Simulator } from "@/sim/gpu/simulator";
 import type { Vec2 } from "@/sim/motion";
 import type { Stats } from "@/sim/stats";
@@ -8,6 +9,7 @@ import type { Pointer } from "@/sim/uniforms";
 
 /** Cap the backing store on high-DPI displays: past 2x the extra pixels are not visible. */
 const MAX_PIXEL_RATIO = 2;
+const RELAYOUT_DELAY_MS = 300;
 /** Frames between particle read-backs for the statistics panel. */
 const STATS_INTERVAL_FRAMES = 15;
 
@@ -50,12 +52,20 @@ export const SimulationCanvas = ({
     const abort = new AbortController();
     let frameId = 0;
 
+    let gridColumns = 0;
+    let relayoutTimer: ReturnType<typeof setTimeout> | undefined;
     const resize = (): void => {
-      const size = Math.round(
-        canvas.clientWidth * Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO),
-      );
-      canvas.width = size;
-      canvas.height = size;
+      const ratio = Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO);
+      canvas.width = Math.max(1, Math.round(canvas.clientWidth * ratio));
+      canvas.height = Math.max(1, Math.round(canvas.clientHeight * ratio));
+      gridColumns = gridColumnsFor(canvas.clientWidth, canvas.clientHeight);
+      const simulator = simulatorRef.current;
+      if (simulator === undefined) return;
+      simulator.setGridColumns(gridColumns);
+      clearTimeout(relayoutTimer);
+      relayoutTimer = setTimeout(() => {
+        if (simulator.sceneIsStale) simulator.load(settingsRef.current.scene);
+      }, RELAYOUT_DELAY_MS);
     };
     resize();
     const observer = new ResizeObserver(resize);
@@ -63,7 +73,9 @@ export const SimulationCanvas = ({
 
     const track = (event: PointerEvent): void => {
       const rect = canvas.getBoundingClientRect();
-      pointerRef.current.x = (event.clientX - rect.left) / rect.width;
+      pointerRef.current.x =
+        ((event.clientX - rect.left) / rect.width) *
+        domainWidthFor(gridColumns);
       pointerRef.current.y = 1 - (event.clientY - rect.top) / rect.height;
     };
     const onPointerDown = (event: PointerEvent): void => {
@@ -79,7 +91,7 @@ export const SimulationCanvas = ({
     canvas.addEventListener("pointerup", onPointerUp);
     canvas.addEventListener("pointercancel", onPointerUp);
 
-    void Simulator.create(canvas, abort.signal)
+    void Simulator.create(canvas, abort.signal, gridColumns)
       .then((simulator) => {
         if (abort.signal.aborted) return;
         if (simulator === undefined) {
@@ -87,6 +99,8 @@ export const SimulationCanvas = ({
           return;
         }
         simulatorRef.current = simulator;
+        // The canvas may have resized while the device was being requested.
+        simulator.setGridColumns(gridColumns);
         simulator.load(settingsRef.current.scene);
         setReady(true);
 
@@ -127,6 +141,7 @@ export const SimulationCanvas = ({
 
     return () => {
       abort.abort();
+      clearTimeout(relayoutTimer);
       cancelAnimationFrame(frameId);
       observer.disconnect();
       canvas.removeEventListener("pointerdown", onPointerDown);

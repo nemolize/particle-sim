@@ -1,6 +1,10 @@
-/** Cells per side of the background grid; the domain is the unit square. */
-export const GRID_SIZE = 128;
-export const CELL_SIZE = 1 / GRID_SIZE;
+/** The domain is one unit tall and as wide as the window's aspect ratio asks. */
+export const GRID_ROWS = 128;
+export const CELL_SIZE = 1 / GRID_ROWS;
+/** The narrowest domain, about 0.39 tall units wide, in which every scene still fits inside the walls. */
+export const MIN_GRID_COLUMNS = 50;
+/** Sizes the grid buffer, so the window may be at most four times as wide as tall. */
+export const MAX_GRID_COLUMNS = 512;
 export const FRAME_TIME = 0.01;
 /**
  * Fluid stiffness at which `REFERENCE_SUBSTEPS` steps per frame are stable (see `timestep.ts`),
@@ -28,7 +32,7 @@ export const OFFSET_F = 10;
 export const MATERIAL_FLUID = 0;
 export const MATERIAL_SOLID = 1;
 
-/** Radius of the pointer's influence, as a fraction of the domain. */
+/** Radius of the pointer's influence, in domain units (the domain is one unit tall). */
 export const POINTER_RADIUS = 0.12;
 /** Pointer acceleration at its centre, in domain units per second squared. */
 export const POINTER_ACCELERATION = 80;

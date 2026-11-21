@@ -21,7 +21,7 @@ export interface Stats {
 }
 
 /** Summarise a read-back particle buffer. */
-export const summarize = (data: Float32Array): Stats => {
+export const summarize = (data: Float32Array, width: number): Stats => {
   const count = data.length / PARTICLE_STRIDE;
   let heightSum = 0;
   let maxSpeed = 0;
@@ -44,7 +44,7 @@ export const summarize = (data: Float32Array): Stats => {
     if (
       !Number.isFinite(x + y + speed + deformation) ||
       x < -PARTICLE_SPACING ||
-      x > 1 + PARTICLE_SPACING ||
+      x > width + PARTICLE_SPACING ||
       y < -PARTICLE_SPACING ||
       y > 1 + PARTICLE_SPACING
     ) {

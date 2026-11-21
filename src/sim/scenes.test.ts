@@ -2,10 +2,12 @@ import { expect, it } from "vitest";
 
 import { type Scene, SCENES } from "@/settings";
 
+import { domainWidthFor } from "./domain";
 import {
   CELL_SIZE,
   MATERIAL_FLUID,
   MATERIAL_SOLID,
+  MIN_GRID_COLUMNS,
   OFFSET_F,
   OFFSET_J,
   OFFSET_MATERIAL,
@@ -16,10 +18,15 @@ import {
 } from "./params";
 import { countParticles, createParticles, TILT_ANGLE } from "./scenes";
 
-it.each(SCENES)(
-  "%s: every particle is inside the walls, undeformed",
-  (scene) => {
-    const data = createParticles(scene);
+const MIN_WIDTH = domainWidthFor(MIN_GRID_COLUMNS);
+const WIDTHS = [MIN_WIDTH, 1, 1.78, 3];
+
+it.each(
+  SCENES.flatMap((scene) => WIDTHS.map((width) => [scene, width] as const)),
+)(
+  "%s at width %s: every particle is inside the walls, undeformed",
+  (scene, width) => {
+    const data = createParticles(scene, width);
     const count = countParticles(data);
     expect(count).toBeGreaterThan(1000);
     expect(data.length).toBe(count * PARTICLE_STRIDE);
@@ -29,7 +36,7 @@ it.each(SCENES)(
       const y = data[base + OFFSET_X + 1] ?? Number.NaN;
       // The grid zeroes velocity into the outer three cells.
       expect(x).toBeGreaterThan(3 * CELL_SIZE);
-      expect(x).toBeLessThan(1 - 3 * CELL_SIZE);
+      expect(x).toBeLessThan(width - 3 * CELL_SIZE);
       expect(y).toBeGreaterThan(3 * CELL_SIZE);
       expect(y).toBeLessThan(1 - 3 * CELL_SIZE);
       expect(data[base + OFFSET_J]).toBe(1);
@@ -41,7 +48,7 @@ it.each(SCENES)(
 );
 
 const materials = (scene: Scene): number[] => {
-  const data = createParticles(scene);
+  const data = createParticles(scene, 1);
   return Array.from(
     { length: countParticles(data) },
     (_, i) => data[i * PARTICLE_STRIDE + OFFSET_MATERIAL] ?? Number.NaN,
@@ -65,7 +72,7 @@ it("block: a solid-only scene", () => {
 });
 
 it("splash: a solid block above a fluid pool", () => {
-  const data = createParticles("splash");
+  const data = createParticles("splash", 1);
   let solids = 0;
   let fluids = 0;
   let lowestSolid = Infinity;
@@ -87,7 +94,7 @@ it("splash: a solid block above a fluid pool", () => {
 });
 
 it("tilt: a solid block turned by 30 degrees above a fluid pool", () => {
-  const data = createParticles("tilt");
+  const data = createParticles("tilt", 1);
   const xs: number[] = [];
   const ys: number[] = [];
   let fluids = 0;
@@ -115,13 +122,13 @@ it("tilt: a solid block turned by 30 degrees above a fluid pool", () => {
 });
 
 it("packs four particles per grid cell", () => {
-  const count = countParticles(createParticles("dam"));
+  const count = countParticles(createParticles("dam", 1));
   const cells = ((0.42 - 0.06) / CELL_SIZE) * ((0.62 - 0.06) / CELL_SIZE);
   expect(count / cells).toBeCloseTo(4, 0);
 });
 
 it("gives the colliding blobs opposite velocities and a disc outline", () => {
-  const data = createParticles("collision");
+  const data = createParticles("collision", 1);
   const count = countParticles(data);
   const velocities = new Set<number>();
   for (let i = 0; i < count; i++) {
