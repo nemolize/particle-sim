@@ -59,6 +59,9 @@ test("should run the dam break without diverging", async ({ page }) => {
     .poll(meanHeight, { timeout: 30_000 })
     .toBeLessThan(before - 0.05);
   await expect(stats).toContainText("Stable");
+  await expect(page.getByLabel("Frame timing")).toHaveText(
+    /[1-9]\d* FPS · \d+\.\d ms/,
+  );
 });
 
 test("should rebuild the scene when Reset is pressed", async ({ page }) => {

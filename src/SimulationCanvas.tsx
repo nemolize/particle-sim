@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { Settings } from "@/settings";
 import { domainWidthFor, gridColumnsFor } from "@/sim/domain";
+import { FrameMeter, type FrameTiming } from "@/sim/frameMeter";
 import { Simulator } from "@/sim/gpu/simulator";
 import type { Vec2 } from "@/sim/motion";
 import type { Stats } from "@/sim/stats";
@@ -12,6 +13,7 @@ const MAX_PIXEL_RATIO = 2;
 const RELAYOUT_DELAY_MS = 300;
 /** Frames between particle read-backs for the statistics panel. */
 const STATS_INTERVAL_FRAMES = 15;
+const TIMING_WINDOW_MS = 500;
 
 interface Props {
   settings: Settings;
@@ -33,6 +35,7 @@ export const SimulationCanvas = ({
   const simulatorRef = useRef<Simulator>(undefined);
   const [failed, setFailed] = useState(false);
   const [ready, setReady] = useState(false);
+  const [timing, setTiming] = useState<FrameTiming>();
   // Read inside the frame loop through refs so a slider move does not restart it.
   const settingsRef = useRef(settings);
   const pausedRef = useRef(paused);
@@ -106,11 +109,13 @@ export const SimulationCanvas = ({
 
         let frame = 0;
         let busy = false;
+        const meter = new FrameMeter(TIMING_WINDOW_MS);
         const tick = (): void => {
           frameId = requestAnimationFrame(tick);
           if (busy) return;
           busy = true;
           frame++;
+          const startedAt = performance.now();
           void simulator
             .frame(
               settingsRef.current,
@@ -122,9 +127,15 @@ export const SimulationCanvas = ({
               },
             )
             .then((stats) => {
-              if (stats !== undefined && !abort.signal.aborted) {
-                onStatsRef.current(stats);
-              }
+              if (abort.signal.aborted) return;
+              if (stats !== undefined) onStatsRef.current(stats);
+              const now = performance.now();
+              // A read-back frame also waited on the copy, so it is not timed.
+              const next = meter.record(
+                now,
+                stats === undefined ? now - startedAt : undefined,
+              );
+              if (next !== undefined) setTiming(next);
             })
             .catch(() => {
               if (!abort.signal.aborted) setFailed(true);
@@ -167,6 +178,14 @@ export const SimulationCanvas = ({
         data-ready={ready}
         className="size-full touch-none bg-slate-900"
       />
+      {timing === undefined ? null : (
+        <p
+          aria-label="Frame timing"
+          className="pointer-events-none absolute top-4 left-4 rounded bg-black/60 px-2 py-1 font-mono text-xs text-white tabular-nums"
+        >
+          {timing.fps.toFixed(0)} FPS · {timing.processingMs.toFixed(1)} ms
+        </p>
+      )}
       {failed ? (
         <p
           role="alert"
