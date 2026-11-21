@@ -1,7 +1,7 @@
 import {
   CELL_SIZE,
   FIXED_POINT_SCALE,
-  GRID_SIZE,
+  GRID_ROWS,
   MATERIAL_SOLID,
   PARTICLE_SPACING,
 } from "../params";
@@ -19,6 +19,7 @@ struct Params {
   pointerRadius: f32,
   pointerAccel: f32,
   solidStiffness: f32,
+  gridColumns: u32,
 }
 
 struct Particle {
@@ -30,13 +31,16 @@ struct Particle {
   f: mat2x2f,
 }
 
-const GRID: u32 = ${String(GRID_SIZE)}u;
-const CELLS: u32 = ${String(GRID_SIZE * GRID_SIZE)}u;
-const GRID_F: f32 = ${f(GRID_SIZE)};
+const ROWS: u32 = ${String(GRID_ROWS)}u;
+const GRID_F: f32 = ${f(GRID_ROWS)};
 const DX: f32 = ${f(CELL_SIZE)};
-const INV_DX: f32 = ${f(GRID_SIZE)};
+const INV_DX: f32 = ${f(GRID_ROWS)};
 const FIXED: f32 = ${f(FIXED_POINT_SCALE)};
 const SOLID: f32 = ${f(MATERIAL_SOLID)};
+
+fn domainSize() -> vec2f {
+  return vec2f(f32(params.gridColumns), GRID_F) * DX;
+}
 
 fn isSolid(p: Particle) -> bool {
   return p.material > 0.5 * SOLID;
@@ -51,6 +55,11 @@ ${COMMON}
 // Per cell: mass, momentum x, momentum y, as fixed-point i32 so atomicAdd can sum them.
 @group(0) @binding(2) var<storage, read_write> grid: array<atomic<i32>>;
 @group(0) @binding(3) var<storage, read_write> gridVelocity: array<vec2f>;
+
+// A window resize can narrow the domain under particles; keep the 3x3 stencil inside the grid.
+fn insideDomain(x: vec2f) -> vec2f {
+  return clamp(x, vec2f(2.0 * DX), domainSize() - 2.0 * DX);
+}
 
 const MIN_DET: f32 = 0.1;
 // Chosen empirically, no fixed source: without a floor on the pressure, fluid packed against a wall blows up.
@@ -88,7 +97,7 @@ fn weights(fx: vec2f) -> array<vec2f, 3> {
 
 @compute @workgroup_size(64)
 fn clearGrid(@builtin(global_invocation_id) id: vec3u) {
-  if (id.x >= CELLS) { return; }
+  if (id.x >= params.gridColumns * ROWS) { return; }
   atomicStore(&grid[3u * id.x], 0);
   atomicStore(&grid[3u * id.x + 1u], 0);
   atomicStore(&grid[3u * id.x + 2u], 0);
@@ -99,7 +108,7 @@ fn clearGrid(@builtin(global_invocation_id) id: vec3u) {
 fn particleToGrid(@builtin(global_invocation_id) id: vec3u) {
   if (id.x >= params.count) { return; }
   let p = particles[id.x];
-  let xg = p.x * GRID_F;
+  let xg = insideDomain(p.x) * GRID_F;
   let base = vec2i(floor(xg - 0.5));
   let fx = xg - vec2f(base);
   var w = weights(fx);
@@ -119,7 +128,7 @@ fn particleToGrid(@builtin(global_invocation_id) id: vec3u) {
       let weight = w[a].x * w[b].y;
       let momentum = weight * (p.v + affine * dpos);
       let cell = vec2u(base + vec2i(a, b));
-      let index = 3u * (cell.y * GRID + cell.x);
+      let index = 3u * (cell.y * params.gridColumns + cell.x);
       atomicAdd(&grid[index], i32(round(weight * FIXED)));
       atomicAdd(&grid[index + 1u], i32(round(momentum.x * FIXED)));
       atomicAdd(&grid[index + 2u], i32(round(momentum.y * FIXED)));
@@ -131,14 +140,14 @@ fn particleToGrid(@builtin(global_invocation_id) id: vec3u) {
 @compute @workgroup_size(64)
 fn updateGrid(@builtin(global_invocation_id) id: vec3u) {
   let i = id.x;
-  if (i >= CELLS) { return; }
+  if (i >= params.gridColumns * ROWS) { return; }
   let mass = f32(atomicLoad(&grid[3u * i])) / FIXED;
   var v = vec2f(0.0);
   if (mass > 0.0) {
     v = vec2f(f32(atomicLoad(&grid[3u * i + 1u])), f32(atomicLoad(&grid[3u * i + 2u]))) / (FIXED * mass);
     v += params.dt * params.gravity;
 
-    let node = vec2f(f32(i % GRID), f32(i / GRID));
+    let node = vec2f(f32(i % params.gridColumns), f32(i / params.gridColumns));
     let toPointer = params.pointer - node * DX;
     let distance = length(toPointer);
     if (distance < params.pointerRadius && distance > 1e-5) {
@@ -146,10 +155,10 @@ fn updateGrid(@builtin(global_invocation_id) id: vec3u) {
     }
 
     // Three-cell walls: no velocity into the boundary.
-    let x = i % GRID;
-    let y = i / GRID;
-    if ((x < 3u && v.x < 0.0) || (x > GRID - 3u && v.x > 0.0)) { v.x = 0.0; }
-    if ((y < 3u && v.y < 0.0) || (y > GRID - 3u && v.y > 0.0)) { v.y = 0.0; }
+    let x = i % params.gridColumns;
+    let y = i / params.gridColumns;
+    if ((x < 3u && v.x < 0.0) || (x > params.gridColumns - 3u && v.x > 0.0)) { v.x = 0.0; }
+    if ((y < 3u && v.y < 0.0) || (y > ROWS - 3u && v.y > 0.0)) { v.y = 0.0; }
   }
   gridVelocity[i] = v;
 }
@@ -159,6 +168,7 @@ fn updateGrid(@builtin(global_invocation_id) id: vec3u) {
 fn gridToParticle(@builtin(global_invocation_id) id: vec3u) {
   if (id.x >= params.count) { return; }
   var p = particles[id.x];
+  p.x = insideDomain(p.x);
   let xg = p.x * GRID_F;
   let base = vec2i(floor(xg - 0.5));
   let fx = xg - vec2f(base);
@@ -170,7 +180,7 @@ fn gridToParticle(@builtin(global_invocation_id) id: vec3u) {
     for (var b = 0; b < 3; b++) {
       let dpos = vec2f(f32(a), f32(b)) - fx;
       let cell = vec2u(base + vec2i(a, b));
-      let gv = gridVelocity[cell.y * GRID + cell.x];
+      let gv = gridVelocity[cell.y * params.gridColumns + cell.x];
       let weight = w[a].x * w[b].y;
       velocity += weight * gv;
       c += (4.0 * INV_DX * weight) * mat2x2f(gv * dpos.x, gv * dpos.y);
@@ -179,8 +189,7 @@ fn gridToParticle(@builtin(global_invocation_id) id: vec3u) {
 
   p.v = velocity;
   p.c = c;
-  // Keeps the 3x3 stencil inside the grid even if a particle slips into the wall cells.
-  p.x = clamp(p.x + params.dt * velocity, vec2f(2.0 * DX), vec2f(1.0 - 2.0 * DX));
+  p.x = insideDomain(p.x + params.dt * velocity);
   if (isSolid(p)) {
     p.f = keepInvertible((mat2x2f(1.0, 0.0, 0.0, 1.0) + params.dt * c) * p.f);
   } else {
@@ -194,6 +203,7 @@ export const RENDER_SHADER = /* wgsl */ `
 ${COMMON}
 
 @group(0) @binding(0) var<storage, read> particles: array<Particle>;
+@group(0) @binding(1) var<uniform> params: Params;
 
 struct Vertex {
   @builtin(position) position: vec4f,
@@ -212,10 +222,11 @@ fn vertexMain(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) 
   );
   let corner = corners[vi];
   let p = particles[ii];
-  // The domain is [0,1]^2; clip space is [-1,1]^2 with y up, like the domain.
-  let centre = p.x * 2.0 - 1.0;
+  // The domain is [0,width]x[0,1]; clip space is [-1,1]^2 with y up, like the domain.
+  let size = domainSize();
+  let centre = p.x / size * 2.0 - 1.0;
   var out: Vertex;
-  out.position = vec4f(centre + corner * RADIUS * 2.0, 0.0, 1.0);
+  out.position = vec4f(centre + corner * RADIUS * 2.0 / size, 0.0, 1.0);
   out.corner = corner;
   out.speed = length(p.v);
   out.solid = select(0.0, 1.0, isSolid(p));

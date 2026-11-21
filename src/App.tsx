@@ -42,7 +42,7 @@ const App = () => {
   }, [panelOpen]);
 
   return (
-    <main className="relative flex h-dvh w-full items-center justify-center overflow-hidden bg-gray-50">
+    <main className="relative flex h-dvh w-full items-center justify-center overflow-hidden bg-slate-900">
       <h1 className="sr-only text-2xl font-bold text-gray-800">Particle Sim</h1>
       <button
         ref={toggleRef}
@@ -56,7 +56,7 @@ const App = () => {
       >
         Settings
       </button>
-      <div className="size-[min(100dvw,100dvh)]">
+      <div className="size-full">
         {supportsWebGpu() ? (
           <SimulationCanvas
             settings={settings}

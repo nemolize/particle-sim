@@ -68,28 +68,51 @@ const tiltedSquare = (
   };
 };
 
-const SCENE_BLOBS: Record<Scene, readonly Blob[]> = {
-  dam: [rect([0.06, 0.06], [0.42, 0.62])],
-  drop: [rect([0.05, 0.05], [0.95, 0.2]), disc([0.5, 0.6], 0.12)],
-  collision: [
-    disc([0.25, 0.5], 0.13, [3, 0]),
-    disc([0.75, 0.5], 0.13, [-3, 0]),
-  ],
-  block: [rect([0.4, 0.4], [0.6, 0.6], [0, 0], MATERIAL_SOLID)],
-  splash: [
-    rect([0.05, 0.05], [0.95, 0.25]),
-    rect([0.4, 0.3], [0.55, 0.45], [0, 0], MATERIAL_SOLID),
-  ],
-  tilt: [
-    rect([0.05, 0.05], [0.95, 0.25]),
-    tiltedSquare([0.475, 0.375], 0.15, TILT_ANGLE, MATERIAL_SOLID),
-  ],
+const sceneBlobs = (scene: Scene, width: number): readonly Blob[] => {
+  const middle = width / 2;
+  const pool = rect([0.05, 0.05], [width - 0.05, 0.25]);
+  switch (scene) {
+    case "dam":
+      return [rect([0.06, 0.06], [Math.min(0.42, width / 2), 0.62])];
+    case "drop":
+      return [
+        rect([0.05, 0.05], [width - 0.05, 0.2]),
+        disc([middle, 0.6], 0.12),
+      ];
+    case "collision": {
+      // At the narrowest width the discs must stay clear of the wall cells.
+      const radius = Math.min(0.13, width * 0.18);
+      return [
+        disc([width * 0.25, 0.5], radius, [3, 0]),
+        disc([width * 0.75, 0.5], radius, [-3, 0]),
+      ];
+    }
+    case "block":
+      return [
+        rect([middle - 0.1, 0.4], [middle + 0.1, 0.6], [0, 0], MATERIAL_SOLID),
+      ];
+    case "splash":
+      return [
+        pool,
+        rect(
+          [middle - 0.1, 0.3],
+          [middle + 0.05, 0.45],
+          [0, 0],
+          MATERIAL_SOLID,
+        ),
+      ];
+    case "tilt":
+      return [
+        pool,
+        tiltedSquare([middle - 0.025, 0.375], 0.15, TILT_ANGLE, MATERIAL_SOLID),
+      ];
+  }
 };
 
 /** Particle data in the layout of the GPU buffer: undeformed (J = 1, F = identity). */
-export const createParticles = (scene: Scene): Float32Array => {
+export const createParticles = (scene: Scene, width: number): Float32Array => {
   const values: number[] = [];
-  for (const blob of SCENE_BLOBS[scene]) {
+  for (const blob of sceneBlobs(scene, width)) {
     // Lattice points sit at cell-quarter offsets so every cell starts with four particles.
     for (let x = blob.min[0]; x <= blob.max[0]; x += PARTICLE_SPACING) {
       for (let y = blob.min[1]; y <= blob.max[1]; y += PARTICLE_SPACING) {

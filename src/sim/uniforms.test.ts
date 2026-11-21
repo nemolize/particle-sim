@@ -7,12 +7,15 @@ import { POINTER_ACCELERATION, POINTER_RADIUS } from "./params";
 import { timeStepFor } from "./timestep";
 import { packUniforms, UNIFORM_BYTES } from "./uniforms";
 
+const GRID_COLUMNS = 228;
+
 const pack = (pressed: boolean, pointerMode = DEFAULT_SETTINGS.pointerMode) => {
   const buffer = packUniforms(
     { ...DEFAULT_SETTINGS, pointerMode },
     12345,
     { x: 0.3, y: 0.7, pressed },
     GRAVITY_AT_REST,
+    GRID_COLUMNS,
   );
   return { floats: new Float32Array(buffer), uints: new Uint32Array(buffer) };
 };
@@ -30,6 +33,7 @@ it("matches the field order of the WGSL Params struct", () => {
   expect(floats[7]).toBeCloseTo(POINTER_RADIUS);
   expect(floats[8]).toBe(POINTER_ACCELERATION);
   expect(floats[9]).toBe(DEFAULT_SETTINGS.solidStiffness);
+  expect(uints[10]).toBe(GRID_COLUMNS);
 });
 
 it("packs the default settings as the straight-down gravity it always had", () => {
@@ -43,6 +47,7 @@ it("scales the pull by the gravity setting", () => {
     1,
     { x: 0, y: 0, pressed: false },
     { x: 2, y: 3 },
+    GRID_COLUMNS,
   );
   expect(Array.from(new Float32Array(buffer).slice(0, 2))).toEqual([10, 15]);
 });
@@ -53,6 +58,7 @@ it("carries the solid stiffness of the settings it is given", () => {
     1,
     { x: 0, y: 0, pressed: false },
     GRAVITY_AT_REST,
+    GRID_COLUMNS,
   );
   expect(new Float32Array(buffer)[9]).toBe(225);
 });
@@ -68,6 +74,7 @@ it("packs a shorter time step for a stiffer fluid", () => {
     1,
     { x: 0, y: 0, pressed: false },
     GRAVITY_AT_REST,
+    GRID_COLUMNS,
   );
   const dt = new Float32Array(buffer)[5];
   expect(dt).toBeCloseTo(timeStepFor(STIFFNESS_RANGE.max), 8);

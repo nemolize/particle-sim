@@ -4,13 +4,14 @@ import type { Vec2 } from "./motion";
 import { POINTER_ACCELERATION, POINTER_RADIUS } from "./params";
 import { timeStepFor } from "./timestep";
 
+/** The pointer in domain units: x across the domain's width, y up from the floor. */
 export interface Pointer {
   x: number;
   y: number;
   pressed: boolean;
 }
 
-export const UNIFORM_BYTES = 40;
+export const UNIFORM_BYTES = 48;
 
 const POINTER_SIGN: Record<PointerMode, number> = { attract: 1, repel: -1 };
 
@@ -23,6 +24,7 @@ export const packUniforms = (
   count: number,
   pointer: Pointer,
   pull: Vec2,
+  gridColumns: number,
 ): ArrayBuffer => {
   const buffer = new ArrayBuffer(UNIFORM_BYTES);
   const floats = new Float32Array(buffer);
@@ -38,5 +40,6 @@ export const packUniforms = (
     ? POINTER_ACCELERATION * POINTER_SIGN[settings.pointerMode]
     : 0;
   floats[9] = settings.solidStiffness;
+  new Uint32Array(buffer)[10] = gridColumns;
   return buffer;
 };

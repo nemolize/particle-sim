@@ -10,7 +10,7 @@ travel back to the CPU for rendering.
 
 - **MLS-MPM** — particles carry mass, velocity, an affine velocity matrix, a
   material, the volume ratio `J` and a 2x2 deformation gradient `F`. Each step
-  scatters them to a 128x128 grid, updates the grid, and gathers the result back.
+  scatters them to a grid 128 rows tall and as many columns wide as the window's aspect ratio asks, updates the grid, and gathers the result back.
 - **Fluid** — pressure comes from `J` and a stiffness you can change at run time.
 - **Elastic solid** — stress comes from `F` through the fixed corotated model, with
   its own stiffness you can change at run time. Fluid and solid share the grid, so

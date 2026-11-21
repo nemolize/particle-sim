@@ -172,10 +172,11 @@ test("should keep a tilted solid block recognisable in a fluid pool", async ({
   await expect(stats).toContainText("Stable");
 });
 
-const PRESS_AT_BLOCK_CENTRE = { x: 0.5, y: 0.9 };
+/** `x` is the offset from the block's centre in domain units, `y` the fraction of the height from the top. */
+const PRESS_AT_BLOCK_CENTRE = { x: 0, y: 0.9 };
 /** Beside the resting block, 0.08 from its edge and inside the pointer radius. */
-const PRESS_BESIDE_BLOCK = { x: 0.68, y: 0.9 };
-const PRESS_OUT_OF_REACH = { x: 0.9, y: 0.9 };
+const PRESS_BESIDE_BLOCK = { x: 0.18, y: 0.9 };
+const PRESS_OUT_OF_REACH = { x: 0.4, y: 0.9 };
 const ATTRACT_REACH_SPEED = 0.3;
 const REPEL_REACH_SPEED = 0.2;
 const RESTING_SPEED_CEILING = 0.2;
@@ -192,8 +193,14 @@ const pressOnCanvas = async (
   press: { x: number; y: number },
 ): Promise<void> => {
   const canvas = page.getByLabel("Particle simulation");
-  const side = await canvas.evaluate((element) => element.clientWidth);
-  await canvas.hover({ position: { x: side * press.x, y: side * press.y } });
+  // The domain is one unit tall, so a domain unit is the canvas height in pixels.
+  const { width, height } = await canvas.evaluate((element) => ({
+    width: element.clientWidth,
+    height: element.clientHeight,
+  }));
+  await canvas.hover({
+    position: { x: width / 2 + height * press.x, y: height * press.y },
+  });
   await page.mouse.down();
 };
 
@@ -278,7 +285,7 @@ test("should lift the fluid when the device is turned upside down", async ({
 }) => {
   test.setTimeout(GRAVITY_TEST_TIMEOUT_MS);
   const stats = await startMotionScene(page);
-  const startHeight = summarize(createParticles("dam")).meanHeight;
+  const startHeight = summarize(createParticles("dam", 1), 1).meanHeight;
 
   await sendAccelerations(page, [{ x: 0, y: -SENSOR_G }]);
   await expect
@@ -339,18 +346,17 @@ for (const viewport of [
   { width: 1280, height: 720 },
   { width: 390, height: 844 },
 ]) {
-  test(`should fill the ${String(viewport.width)}x${String(viewport.height)} viewport with a square canvas and no scroll`, async ({
+  test(`should fill the ${String(viewport.width)}x${String(viewport.height)} viewport with the canvas and no scroll`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport);
     await page.goto("/");
     await expect(page.getByLabel("Scene")).toHaveCount(0);
 
-    const side = Math.min(viewport.width, viewport.height);
     const canvas = page.getByLabel("Particle simulation");
     const box = await canvas.boundingBox();
-    expect(box?.width).toBeCloseTo(side, 0);
-    expect(box?.height).toBeCloseTo(side, 0);
+    expect(box?.width).toBeCloseTo(viewport.width, 0);
+    expect(box?.height).toBeCloseTo(viewport.height, 0);
 
     await openSettings(page);
     const opened = await canvas.boundingBox();
@@ -365,6 +371,42 @@ for (const viewport of [
     expect(scrolls).toBe(false);
   });
 }
+
+test("should stay stable and keep filling the window when it is resized after loading", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto("/");
+  test.skip(
+    !(await hasUsableWebGpu(page)),
+    "no hardware WebGPU in this browser",
+  );
+  await openSettings(page);
+  const canvas = page.getByLabel("Particle simulation");
+  await expect(canvas).toHaveAttribute("data-ready", "true", {
+    timeout: 30_000,
+  });
+  const stats = page.getByLabel("Simulation statistics");
+  // The drop scene's pool spans the domain width, so its size shows whether the layout followed the resize.
+  await page.getByLabel("Scene").selectOption("drop");
+  await page.getByRole("button", { name: "Reset" }).click();
+  await expect(stats).toContainText("Stable", { timeout: 30_000 });
+  await expect
+    .poll(async () => readStat(stats, "Particles"), { timeout: 30_000 })
+    .toBeGreaterThan(1000);
+  const wideCount = await readStat(stats, "Particles");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect
+    .poll(async () => readStat(stats, "Particles"), { timeout: 10_000 })
+    .toBeLessThan(wideCount / 2);
+  const box = await canvas.boundingBox();
+  expect(box?.width).toBeCloseTo(390, 0);
+  expect(box?.height).toBeCloseTo(844, 0);
+  await expect
+    .poll(stableReads(stats), { intervals: [500], timeout: 30_000 })
+    .toBeGreaterThanOrEqual(6);
+});
 
 test("should close the settings panel on Escape", async ({ page }) => {
   await page.goto("/");
