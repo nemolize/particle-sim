@@ -1,9 +1,10 @@
 import type { Settings } from "@/settings";
 
 import type { Vec2 } from "../motion";
-import { GRID_SIZE, PARTICLE_STRIDE, SUBSTEPS_PER_FRAME } from "../params";
+import { GRID_SIZE, PARTICLE_STRIDE } from "../params";
 import { countParticles, createParticles } from "../scenes";
 import { type Stats, summarize } from "../stats";
+import { substepsFor } from "../timestep";
 import { packUniforms, type Pointer, UNIFORM_BYTES } from "../uniforms";
 import { COMPUTE_SHADER, RENDER_SHADER } from "./shaders";
 
@@ -210,7 +211,7 @@ export class Simulator {
     if (options.step) {
       const pass = encoder.beginComputePass();
       pass.setBindGroup(0, scenario.computeGroup);
-      for (let step = 0; step < SUBSTEPS_PER_FRAME; step++) {
+      for (let step = 0; step < substepsFor(settings.stiffness); step++) {
         pass.setPipeline(this.pipelines.clearGrid);
         pass.dispatchWorkgroups(workgroups(GRID_SIZE * GRID_SIZE));
         pass.setPipeline(this.pipelines.particleToGrid);

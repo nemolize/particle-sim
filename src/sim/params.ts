@@ -1,10 +1,13 @@
 /** Cells per side of the background grid; the domain is the unit square. */
 export const GRID_SIZE = 128;
 export const CELL_SIZE = 1 / GRID_SIZE;
-/** Solver steps per rendered frame. */
-export const SUBSTEPS_PER_FRAME = 50;
-/** Solver time step in seconds, small enough for the stiffness range in `settings.ts`. */
-export const TIME_STEP = 2e-4;
+export const FRAME_TIME = 0.01;
+/**
+ * Fluid stiffness at which `REFERENCE_SUBSTEPS` steps per frame are stable (see `timestep.ts`),
+ * a wave-speed-times-step over cell size of about 0.51; measured unstable from about 0.63.
+ */
+export const REFERENCE_STIFFNESS = 400;
+export const REFERENCE_SUBSTEPS = 50;
 /** Grid sums are accumulated as `i32` through `atomicAdd`, so floats are scaled by this. */
 export const FIXED_POINT_SCALE = 2 ** 16;
 /** Particles per cell side; the stress term in the shader assumes four per cell. */
